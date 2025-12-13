@@ -57,7 +57,7 @@ const Dashboard = () => {
     setIsLoading(true);
     try {
       // Fetch appointments
-      const appointmentsResponse = await fetch('http://localhost:3000/api/appointments/my-appointments', {
+      const appointmentsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/my-appointments`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`

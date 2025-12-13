@@ -212,7 +212,7 @@ const Appointment = () => {
       };
 
       const response = await axios.post(
-        'http://localhost:3000/api/appointments/create',
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/create`,
         appointmentData,
         {
           headers: {
@@ -240,7 +240,7 @@ const Appointment = () => {
   const fetchAppointments = async (token) => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:3000/api/appointments/my-appointments', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/my-appointments`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -322,7 +322,7 @@ const Appointment = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3000/api/appointments/create', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

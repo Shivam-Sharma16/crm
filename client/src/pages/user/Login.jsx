@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { authAPI } from '../../utils/api';
+import axios from 'axios';
 import './Login.css';
 
 const Login = () => {
@@ -34,12 +34,15 @@ const Login = () => {
     }
 
     try {
-      const response = await authAPI.login(formData.email, formData.password);
+      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/login`, {
+        email: formData.email,
+        password: formData.password
+      });
 
-      if (response.success) {
+      if (response.data.success) {
         // Store token in localStorage
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Navigate to redirect URL or home
         const redirect = searchParams.get('redirect');

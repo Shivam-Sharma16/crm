@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { authAPI } from '../../utils/api';
+import axios from 'axios';
 import './Signup.css';
 
 const Signup = () => {
@@ -48,17 +48,17 @@ const Signup = () => {
     }
 
     try {
-      const response = await authAPI.signup(
-        formData.name,
-        formData.email,
-        formData.password,
-        formData.phone
-      );
+      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auth/signup`, {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone
+      });
 
-      if (response.success) {
+      if (response.data.success) {
         // Store token in localStorage
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Navigate to home or dashboard
         navigate('/');
