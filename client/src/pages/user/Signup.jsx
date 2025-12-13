@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { authAPI } from '../../utils/api';
 import './Signup.css';
 
 const Signup = () => {
@@ -48,17 +48,17 @@ const Signup = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:3000/api/auth/signup', {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone
-      });
+      const response = await authAPI.signup(
+        formData.name,
+        formData.email,
+        formData.password,
+        formData.phone
+      );
 
-      if (response.data.success) {
+      if (response.success) {
         // Store token in localStorage
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
         
         // Navigate to home or dashboard
         navigate('/');
