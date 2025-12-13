@@ -10,9 +10,14 @@ const app = express()
 connectDB()
 
 // Middleware
+// server/src/app.js
+
 app.use(cors({
-    origin: 'http://localhost:5173', // Vite default port
-    credentials: true // Allow cookies to be sent
+    origin: [
+        "http://localhost:5173",                // Local Vite
+        "https://crm-ebon-two.vercel.app"       // Production Vercel (NO trailing slash /)
+    ],
+    credentials: true
 }))
 
 app.use(express.json())
