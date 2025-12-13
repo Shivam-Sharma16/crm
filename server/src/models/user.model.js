@@ -73,8 +73,9 @@ async function dropOldUsernameIndex() {
       console.log('✓ Dropped old username_1 index successfully');
     }
   } catch (err) {
-    // Index might not exist or already dropped, ignore error
-    if (err.code !== 27 && err.codeName !== 'IndexNotFound') {
+    // Index might not exist or already dropped, or collection might not exist. Ignore these errors.
+    // Code 26 is "NamespaceNotFound", Code 27 is "IndexNotFound"
+    if (err.code !== 27 && err.code !== 26 && err.codeName !== 'IndexNotFound' && err.codeName !== 'NamespaceNotFound') {
       console.error('Error checking/dropping username index:', err.message);
     }
   }
