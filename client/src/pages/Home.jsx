@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Home.css';
 
 const Home = () => {
+  const navigate = useNavigate();
 
   // Logic to handle scroll animations
   useEffect(() => {
@@ -46,8 +48,18 @@ const Home = () => {
               with compassionate care to ensure your well-being is always prioritized.
             </p>
             <div className="hero-buttons">
-              <button className="btn btn-primary">Book Consultation</button>
-              <button className="btn btn-secondary">View Services</button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => navigate('/services')}
+              >
+                Book Consultation
+              </button>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => navigate('/services')}
+              >
+                View Services
+              </button>
             </div>
             
             <div className="stats-row">
@@ -179,7 +191,12 @@ const Home = () => {
         <div className="cta-content">
           <h2>Ready to Prioritize Your Health?</h2>
           <p>Book an appointment today and experience the difference.</p>
-          <button className="btn btn-white">Schedule Appointment</button>
+          <button 
+            className="btn btn-white"
+            onClick={() => navigate('/services')}
+          >
+            Schedule Appointment
+          </button>
         </div>
       </section>
 

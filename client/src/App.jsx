@@ -1,9 +1,10 @@
 import React from 'react'
 import { MainRoutes } from './routes/mainroutes'
+import './App.css'
 
 const App = () => {
   return (
-   <div>
+   <div style={{ width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
 
      <MainRoutes />
    </div>
