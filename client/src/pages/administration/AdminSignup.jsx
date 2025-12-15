@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAppDispatch, useAuth } from '../../store/hooks';
-import { signupUser, clearError } from '../../store/slices/authSlice';
-import './Signup.css';
+import { adminAPI } from '../../utils/api';
+import '../user/Signup.css';
 
-const Signup = () => {
+const AdminSignup = () => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const { loading, error, isAuthenticated } = useAuth();
-  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,61 +12,80 @@ const Signup = () => {
     confirmPassword: '',
     phone: ''
   });
-  
-  // Navigate after successful signup
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthenticated, navigate]);
-  
-  // Clear error on mount
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
-    dispatch(clearError());
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(clearError());
+    setError('');
+    setLoading(true);
 
     // Validation
     if (!formData.name || !formData.email || !formData.password) {
+      setError('Please fill in all required fields');
+      setLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setLoading(false);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
       return;
     }
 
-    await dispatch(signupUser({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      phone: formData.phone
-    }));
-    
-    // Navigation is handled by useEffect when isAuthenticated changes
+    try {
+      const response = await adminAPI.signup(formData.name, formData.email, formData.password, formData.phone);
+
+      if (response.success) {
+        // Store token in localStorage
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        // Navigate to administrator dashboard
+        navigate('/administrator');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error creating administrator account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoBack = () => {
+    navigate("/"); // Go back to home page
   };
 
   return (
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-card">
+          {/* Back Button */}
+          <button 
+            onClick={handleGoBack}
+            className="back-button"
+            type="button"
+          >
+            <span className="back-icon">←</span>
+            <span>Go Back</span>
+          </button>
+
           <div className="auth-header">
-            <h1>Create Account</h1>
-            <p>Sign up to access our services</p>
+            <h1>Create Administrator Account</h1>
+            <p>Sign up to create an administrator account</p>
           </div>
 
           {error && (
@@ -155,9 +170,15 @@ const Signup = () => {
 
           <div className="auth-footer">
             <p>
-              Already have an account?{' '}
-              <Link to="/login" className="auth-link">
+              Already have an administrator account?{' '}
+              <Link to="/administrator/login" className="auth-link">
                 Sign In
+              </Link>
+            </p>
+            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-gray)' }}>
+              Regular users should use{' '}
+              <Link to="/signup" className="auth-link" style={{ fontSize: '0.85rem' }}>
+                user signup
               </Link>
             </p>
           </div>
@@ -167,7 +188,5 @@ const Signup = () => {
   );
 };
 
-export default Signup;
-
-
+export default AdminSignup;
 

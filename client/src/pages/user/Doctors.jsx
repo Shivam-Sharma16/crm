@@ -1,98 +1,8 @@
 import React, { useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useAppDispatch, useCachedDoctors } from '../../store/hooks';
+import { fetchDoctors } from '../../store/slices/publicDataSlice';
 import './Doctors.css';
-
-// Mock Data for Doctors
-const doctorsData = [
-  { 
-    id: 1, 
-    name: 'Dr. Sarah Cameron', 
-    specialty: 'Senior Embryologist', 
-    services: ['ivf', 'egg-freezing'], 
-    experience: '15 Years',
-    successRate: '92%',
-    patients: '500+',
-    education: 'MD, PhD in Reproductive Medicine',
-    image: '👩‍⚕️'
-  },
-  { 
-    id: 2, 
-    name: 'Dr. Michael Ross', 
-    specialty: 'Infertility Specialist', 
-    services: ['ivf', 'iui'], 
-    experience: '12 Years',
-    successRate: '88%',
-    patients: '450+',
-    education: 'MD, Board Certified Reproductive Endocrinologist',
-    image: '👨‍⚕️'
-  },
-  { 
-    id: 3, 
-    name: 'Dr. Emily Chen', 
-    specialty: 'Reproductive Geneticist', 
-    services: ['genetic-testing', 'donor-program'], 
-    experience: '10 Years',
-    successRate: '95%',
-    patients: '380+',
-    education: 'MD, PhD in Genetics',
-    image: '👩‍⚕️'
-  },
-  { 
-    id: 4, 
-    name: 'Dr. James Wilson', 
-    specialty: 'Urologist & Andrologist', 
-    services: ['icsi', 'male-fertility'], 
-    experience: '18 Years',
-    successRate: '90%',
-    patients: '600+',
-    education: 'MD, FACS, Urology Specialist',
-    image: '👨‍⚕️'
-  },
-  { 
-    id: 5, 
-    name: 'Dr. Anita Roy', 
-    specialty: 'Gynecologist & Obstetrician', 
-    services: ['iui', 'ivf'], 
-    experience: '20 Years',
-    successRate: '94%',
-    patients: '700+',
-    education: 'MD, FRCOG, OB-GYN Specialist',
-    image: '👩‍⚕️'
-  },
-  { 
-    id: 6, 
-    name: 'Dr. Robert Kim', 
-    specialty: 'Fertility Surgeon', 
-    services: ['fertility-surgery', 'ivf'], 
-    experience: '14 Years',
-    successRate: '89%',
-    patients: '420+',
-    education: 'MD, FACS, Minimally Invasive Surgery',
-    image: '👨‍⚕️'
-  },
-  { 
-    id: 7, 
-    name: 'Dr. Lisa Thompson', 
-    specialty: 'Reproductive Endocrinologist', 
-    services: ['surrogacy', 'donor-program'], 
-    experience: '11 Years',
-    successRate: '91%',
-    patients: '350+',
-    education: 'MD, REI Board Certified',
-    image: '👩‍⚕️'
-  },
-  { 
-    id: 8, 
-    name: 'Dr. David Martinez', 
-    specialty: 'IVF Laboratory Director', 
-    services: ['ivf', 'icsi', 'egg-freezing'], 
-    experience: '16 Years',
-    successRate: '93%',
-    patients: '550+',
-    education: 'PhD, HCLD, Embryology Specialist',
-    image: '👨‍⚕️'
-  }
-];
 
 // Service name mapping for display
 const serviceNameMap = {
@@ -110,11 +20,46 @@ const serviceNameMap = {
 const Doctors = () => {
   const { serviceId } = useParams();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const { doctors: doctorsData, loading, error } = useCachedDoctors(serviceId);
   
-  // Filter doctors based on serviceId
-  const filteredDoctors = serviceId 
-    ? doctorsData.filter(doc => doc.services.includes(serviceId))
-    : doctorsData;
+  // Map doctors to expected format
+  const doctors = doctorsData.map((doctor, index) => ({
+    id: doctor._id || doctor.doctorId,
+    name: doctor.name,
+    specialty: doctor.specialty || getSpecialtyFromServices(doctor.services || []),
+    services: doctor.services || [],
+    experience: doctor.experience || 'Experienced',
+    successRate: doctor.successRate || '90%',
+    patients: doctor.patientsCount || '100+',
+    education: doctor.education || 'MD, Specialist',
+    image: doctor.image || (index % 2 === 0 ? '👩‍⚕️' : '👨‍⚕️')
+  }));
+
+  // Helper function to determine specialty based on services
+  const getSpecialtyFromServices = (services) => {
+    if (!services || services.length === 0) return 'General Practitioner';
+    
+    const specialtyMap = {
+      'ivf': 'IVF Specialist',
+      'iui': 'Infertility Specialist',
+      'icsi': 'Reproductive Specialist',
+      'egg-freezing': 'Fertility Preservation Specialist',
+      'genetic-testing': 'Reproductive Geneticist',
+      'donor-program': 'Reproductive Endocrinologist',
+      'male-fertility': 'Urologist & Andrologist',
+      'surrogacy': 'Reproductive Endocrinologist',
+      'fertility-surgery': 'Fertility Surgeon'
+    };
+    
+    // Return specialty based on first service
+    return specialtyMap[services[0]] || 'Fertility Specialist';
+  };
+
+  // Fetch doctors from backend using Redux
+  useEffect(() => {
+    dispatch(fetchDoctors(serviceId || null));
+  }, [serviceId, dispatch]);
 
   // Get service display name
   const serviceTitle = serviceId 
@@ -145,7 +90,7 @@ const Doctors = () => {
     return () => {
       elements.forEach((el) => observer.unobserve(el));
     };
-  }, [serviceId]);
+  }, [serviceId, doctors]);
 
   // Handle appointment booking
   const handleBookAppointment = (doctorId) => {
@@ -186,9 +131,13 @@ const Doctors = () => {
 
         {/* Doctors Grid */}
         <section className="doctors-grid-section">
-          {filteredDoctors.length > 0 ? (
+          {loading ? (
+            <div className="loading-message">Loading doctors...</div>
+          ) : error ? (
+            <div className="error-message">{error}</div>
+          ) : doctors.length > 0 ? (
             <div className="doctors-grid">
-              {filteredDoctors.map((doctor, index) => (
+              {doctors.map((doctor, index) => (
                 <div
                   key={doctor.id}
                   className={`doctor-card animate-on-scroll slide-up delay-${(index % 3) * 100}`}
@@ -271,7 +220,7 @@ const Doctors = () => {
         </section>
 
         {/* CTA Section */}
-        {filteredDoctors.length > 0 && (
+        {doctors.length > 0 && !loading && (
           <section className="doctors-cta animate-on-scroll fade-in">
             <div className="cta-card">
               <h2>Need Help Choosing a Doctor?</h2>
@@ -287,6 +236,7 @@ const Doctors = () => {
 };
 
 export default Doctors;
+
 
 
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useAppDispatch, useCachedServices, useCachedDoctors } from '../../store/hooks';
+import { fetchServices, fetchDoctors } from '../../store/slices/publicDataSlice';
 import './Services.css';
 
 // IVF-related services data
@@ -70,58 +71,6 @@ const servicesData = [
   }
 ];
 
-// Doctors data (matching Doctors.jsx)
-const doctorsData = [
-  { 
-    id: 1, 
-    name: 'Dr. Sarah Cameron', 
-    specialty: 'Senior Embryologist', 
-    services: ['ivf', 'egg-freezing']
-  },
-  { 
-    id: 2, 
-    name: 'Dr. Michael Ross', 
-    specialty: 'Infertility Specialist', 
-    services: ['ivf', 'iui']
-  },
-  { 
-    id: 3, 
-    name: 'Dr. Emily Chen', 
-    specialty: 'Reproductive Geneticist', 
-    services: ['genetic-testing', 'donor-program']
-  },
-  { 
-    id: 4, 
-    name: 'Dr. James Wilson', 
-    specialty: 'Urologist & Andrologist', 
-    services: ['icsi', 'male-fertility']
-  },
-  { 
-    id: 5, 
-    name: 'Dr. Anita Roy', 
-    specialty: 'Gynecologist & Obstetrician', 
-    services: ['iui', 'ivf']
-  },
-  { 
-    id: 6, 
-    name: 'Dr. Robert Kim', 
-    specialty: 'Fertility Surgeon', 
-    services: ['fertility-surgery', 'ivf']
-  },
-  { 
-    id: 7, 
-    name: 'Dr. Lisa Thompson', 
-    specialty: 'Reproductive Endocrinologist', 
-    services: ['surrogacy', 'donor-program']
-  },
-  { 
-    id: 8, 
-    name: 'Dr. David Martinez', 
-    specialty: 'IVF Laboratory Director', 
-    services: ['ivf', 'icsi', 'egg-freezing']
-  }
-];
-
 // Available time slots
 const timeSlots = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -131,6 +80,14 @@ const timeSlots = [
 
 const Services = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  
+  // Redux state
+  const { services: servicesFromRedux, loading: loadingServices } = useCachedServices();
+  const { doctors: allDoctorsData } = useCachedDoctors();
+  
+  // Use Redux data, fallback to static data if empty
+  const services = servicesFromRedux.length > 0 ? servicesFromRedux : servicesData;
   
   // Booking form state
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -145,6 +102,48 @@ const Services = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Fetch services and doctors from backend using Redux
+  useEffect(() => {
+    dispatch(fetchServices());
+    dispatch(fetchDoctors());
+  }, [dispatch]);
+  
+  // Map doctors to expected format
+  const allDoctors = allDoctorsData.map((doctor) => ({
+    id: doctor._id || doctor.doctorId,
+    name: doctor.name,
+    specialty: getSpecialtyFromServices(doctor.services || []),
+    services: doctor.services || []
+  }));
+  
+  // Filter doctors when service changes
+  useEffect(() => {
+    if (formData.serviceId && allDoctors.length > 0) {
+      const filtered = allDoctors.filter(doc => 
+        doc.services && doc.services.includes(formData.serviceId)
+      );
+      setAvailableDoctors(filtered);
+    } else {
+      setAvailableDoctors([]);
+    }
+  }, [formData.serviceId, allDoctors]);
+
+  const getSpecialtyFromServices = (services) => {
+    if (!services || services.length === 0) return 'General Practitioner';
+    const specialtyMap = {
+      'ivf': 'IVF Specialist',
+      'iui': 'Infertility Specialist',
+      'icsi': 'Reproductive Specialist',
+      'egg-freezing': 'Fertility Preservation Specialist',
+      'genetic-testing': 'Reproductive Geneticist',
+      'donor-program': 'Reproductive Endocrinologist',
+      'male-fertility': 'Urologist & Andrologist',
+      'surrogacy': 'Reproductive Endocrinologist',
+      'fertility-surgery': 'Fertility Surgeon'
+    };
+    return specialtyMap[services[0]] || 'Fertility Specialist';
+  };
 
   // Update available time slots based on date
   const updateAvailableTimes = useCallback((selectedDate) => {
@@ -251,7 +250,7 @@ const Services = () => {
 
     // Filter doctors by selected service
     if (selectedServiceId) {
-      const filtered = doctorsData.filter(doc => doc.services.includes(selectedServiceId));
+      const filtered = allDoctors.filter(doc => doc.services && doc.services.includes(selectedServiceId));
       setAvailableDoctors(filtered);
     } else {
       setAvailableDoctors([]);
@@ -315,11 +314,17 @@ const Services = () => {
 
     try {
       // Get selected service and doctor details
-      const selectedService = servicesData.find(s => s.id === formData.serviceId);
-      const selectedDoctor = doctorsData.find(d => d.id === parseInt(formData.doctorId));
+      const selectedService = (services.length > 0 ? services : servicesData).find(s => s.id === formData.serviceId);
+      const selectedDoctor = allDoctors.find(d => (d.id === formData.doctorId || d._id === formData.doctorId));
+
+      if (!selectedDoctor) {
+        setError('Selected doctor not found');
+        setIsSubmitting(false);
+        return;
+      }
 
       const appointmentData = {
-        doctorId: selectedDoctor.id,
+        doctorId: selectedDoctor.id || selectedDoctor._id,
         doctorName: selectedDoctor.name,
         serviceId: selectedService.id,
         serviceName: selectedService.title,
@@ -398,7 +403,7 @@ const Services = () => {
         {/* Services Grid */}
         <section className="services-grid-section">
           <div className="services-grid">
-            {servicesData.map((service, index) => (
+            {(loadingServices ? [] : (services.length > 0 ? services : servicesData)).map((service, index) => (
               <div
                 key={service.id}
                 className={`service-card animate-on-scroll slide-up delay-${(index % 3) * 100}`}
@@ -479,7 +484,7 @@ const Services = () => {
                   className="form-select"
                 >
                   <option value="">Select a service</option>
-                  {servicesData.map(service => (
+                  {(services.length > 0 ? services : servicesData).map(service => (
                     <option key={service.id} value={service.id}>
                       {service.title}
                     </option>
@@ -507,7 +512,7 @@ const Services = () => {
                       : 'Select a doctor'}
                   </option>
                   {availableDoctors.map(doctor => (
-                    <option key={doctor.id} value={doctor.id}>
+                    <option key={doctor.id || doctor._id} value={doctor.id || doctor._id}>
                       {doctor.name} - {doctor.specialty}
                     </option>
                   ))}

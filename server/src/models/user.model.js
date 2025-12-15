@@ -26,8 +26,21 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin', 'doctor'],
+    enum: ['user', 'admin', 'administrator', 'doctor', 'lab', 'pharmacy', 'reception'],
     default: 'user'
+  },
+  services: {
+    type: [String],
+    default: [],
+    validate: {
+      validator: function(services) {
+        // Only validate services if role is doctor
+        if (this.role !== 'doctor') return true;
+        const validServices = ['ivf', 'iui', 'icsi', 'egg-freezing', 'genetic-testing', 'donor-program', 'male-fertility', 'surrogacy', 'fertility-surgery'];
+        return services.every(service => validServices.includes(service));
+      },
+      message: 'Invalid service provided'
+    }
   }
 }, {
   timestamps: true
@@ -49,6 +62,10 @@ userSchema.pre('save', async function() {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
+
+// Add indexes for better query performance
+userSchema.index({ email: 1 }); // Index for email lookups (already unique, but explicit index helps)
+userSchema.index({ role: 1 }); // Index for filtering by role
 
 const User = mongoose.model('User', userSchema);
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Appointment = require('../models/appointment.model');
 const User = require('../models/user.model');
+const Doctor = require('../models/doctor.model');
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -53,10 +54,46 @@ router.post('/create', authenticateToken, async (req, res) => {
       });
     }
 
+    // Find doctor from Doctor collection to get their userId
+    let doctorUserId = null;
+    let doctorDoc = null;
+    
+    if (doctorId) {
+      // Try to find doctor by MongoDB _id (ObjectId)
+      try {
+        doctorDoc = await Doctor.findById(doctorId);
+        if (doctorDoc && doctorDoc.userId) {
+          doctorUserId = doctorDoc.userId;
+        }
+      } catch (err) {
+        // If doctorId is not a valid ObjectId, try finding by doctorId field
+        doctorDoc = await Doctor.findOne({ doctorId: doctorId });
+        if (doctorDoc && doctorDoc.userId) {
+          doctorUserId = doctorDoc.userId;
+        }
+      }
+    }
+    
+    // Fallback: Try to find doctor by name if doctorUserId is still null
+    if (!doctorUserId && doctorName) {
+      const doctorUser = await User.findOne({ name: doctorName, role: 'doctor' });
+      if (doctorUser) {
+        doctorUserId = doctorUser._id;
+      }
+    }
+
+    if (!doctorUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doctor not found. Please select a valid doctor.'
+      });
+    }
+
     // Create appointment
     const appointment = new Appointment({
       userId,
-      doctorId,
+      doctorId: doctorId || null,
+      doctorUserId: doctorUserId, // This is the User._id of the doctor
       doctorName,
       serviceId: serviceId || '',
       serviceName: serviceName || '',
@@ -90,8 +127,11 @@ router.get('/my-appointments', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
 
+    // Use lean() and select() for better performance
     const appointments = await Appointment.find({ userId })
-      .sort({ appointmentDate: -1, appointmentTime: -1 });
+      .select('userId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes')
+      .sort({ appointmentDate: -1, appointmentTime: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -145,6 +185,7 @@ router.patch('/:appointmentId/payment', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+
 
 
 

@@ -134,23 +134,48 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Convert email to lowercase to match database (User model has lowercase: true)
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Find user by email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
+      console.log(`Login attempt failed: User not found for email: ${normalizedEmail}`);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid email or password' 
       });
     }
 
+    // Reject administrator users - they must use administrator login
+    // Allow admin, user, doctor, lab, pharmacy, reception roles to use normal login
+    if (user.role === 'administrator') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Administrators must use the administrator login page' 
+      });
+    }
+    
+    // Validate role - only allow specific roles to login through this route
+    const allowedRoles = ['user', 'admin', 'doctor', 'lab', 'pharmacy', 'reception'];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid user role. Please contact administrator.'
+      });
+    }
+
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
+      console.log(`Login attempt failed: Invalid password for user: ${user.email} (role: ${user.role})`);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid email or password' 
       });
     }
+
+    console.log(`Login successful for user: ${user.email} (role: ${user.role})`);
 
     // Generate JWT token
     const token = jwt.sign(

@@ -1,54 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAppDispatch, useAuth } from '../store/hooks';
+import { logout } from '../store/slices/authSlice';
 import './Navbar.css';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-
-  const checkAuth = () => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      setIsAuthenticated(true);
-      setUser(JSON.parse(userData));
-    } else {
-      setIsAuthenticated(false);
-      setUser(null);
-    }
-  };
-
-  useEffect(() => {
-    checkAuth();
-    
-    // Listen for storage changes (e.g., login/logout from another tab)
-    const handleStorageChange = (e) => {
-      if (e.key === 'token' || e.key === 'user') {
-        checkAuth();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  // Re-check auth when location changes (e.g., after login/signup)
-  useEffect(() => {
-    checkAuth();
-  }, [location]);
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, user } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setIsAuthenticated(false);
-    setUser(null);
+    dispatch(logout());
     navigate('/');
   };
 
@@ -71,43 +33,100 @@ const Navbar = () => {
             Home
           </NavLink>
           
-          <NavLink 
-            to="/services" 
-            className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
-          >
-            Services
-          </NavLink>
-          
-          <NavLink 
-            to="/doctors" 
-            className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
-          >
-            Doctors
-          </NavLink>
-          
-          <NavLink 
-            to="/appointment" 
-            className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
-          >
-            Appointment
-          </NavLink>
-          
-          {isAuthenticated && (
-            <NavLink 
-              to="/lab-reports" 
-              className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
-            >
-              Lab Reports
-            </NavLink>
+          {/* Show user links only for regular users (not admin, not doctor) */}
+          {user?.role !== 'admin' && user?.role !== 'doctor' && (
+            <>
+              <NavLink 
+                to="/services" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Services
+              </NavLink>
+              
+              <NavLink 
+                to="/doctors" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Doctors
+              </NavLink>
+              
+              <NavLink 
+                to="/appointment" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Appointment
+              </NavLink>
+              
+              {isAuthenticated && (
+                <NavLink 
+                  to="/lab-reports" 
+                  className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                >
+                  Lab Reports
+                </NavLink>
+              )}
+              
+              {isAuthenticated && (
+                <NavLink 
+                  to="/dashboard" 
+                  className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+                >
+                  Dashboard
+                </NavLink>
+              )}
+            </>
           )}
           
-          {isAuthenticated && (
+          {/* Show doctor link only for doctors */}
+          {user?.role === 'doctor' && isAuthenticated && (
             <NavLink 
-              to="/dashboard" 
+              to="/doctor/patients" 
               className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
             >
-              Dashboard
+              Patients
             </NavLink>
+          )}
+
+          {/* Show admin links only for admins */}
+          {user?.role === 'admin' && isAuthenticated && (
+            <>
+              <NavLink 
+                to="/admin" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Admin
+              </NavLink>
+              <NavLink 
+                to="/admin/doctors" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Doctors
+              </NavLink>
+              <NavLink 
+                to="/admin/labs" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Labs
+              </NavLink>
+              <NavLink 
+                to="/admin/pharmacy" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Pharmacy
+              </NavLink>
+              <NavLink 
+                to="/admin/reception" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Reception
+              </NavLink>
+              <NavLink 
+                to="/admin/services" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Services
+              </NavLink>
+            </>
           )}
 
           {/* Settings Dropdown */}

@@ -1,73 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { useAppDispatch, useAuth } from '../../store/hooks';
-import { loginUser, clearError } from '../../store/slices/authSlice';
-import './Login.css';
+import { adminAPI } from '../../utils/api';
+import '../user/Login.css';
 
-const Login = () => {
+const AdminLogin = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const dispatch = useAppDispatch();
-  const { loading, error, isAuthenticated, user } = useAuth();
-  
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
-
-  // Clear error on mount
-  useEffect(() => {
-    dispatch(clearError());
-  }, [dispatch]);
-
-  // Navigate after successful login
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const userRole = user.role;
-      if (userRole === 'admin') {
-        navigate('/admin');
-      } else if (userRole === 'doctor') {
-        navigate('/doctor/patients');
-      } else if (userRole === 'lab') {
-        navigate('/lab/dashboard');
-      } else if (userRole === 'pharmacy') {
-        navigate('/pharmacy/dashboard');
-      } else if (userRole === 'reception') {
-        navigate('/reception/dashboard');
-      } else {
-        const redirect = searchParams.get('redirect');
-        navigate(redirect || '/');
-      }
-    }
-  }, [isAuthenticated, user, navigate, searchParams]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
-    dispatch(clearError());
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(clearError());
+    setError('');
+    setLoading(true);
 
     // Validation
     if (!formData.email || !formData.password) {
+      setError('Please fill in all fields');
+      setLoading(false);
       return;
     }
 
-    const result = await dispatch(loginUser({
-      email: formData.email,
-      password: formData.password
-    }));
+    try {
+      const response = await adminAPI.login(formData.email, formData.password);
 
-    // Navigation is handled by useEffect when isAuthenticated changes
+      if (response.success) {
+        // Store token in localStorage
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+        
+        // Navigate to administrator dashboard
+        navigate('/administrator');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoBack = () => {
-    navigate("/"); // Go back to previous page
+    navigate("/"); // Go back to home page
   };
 
   return (
@@ -85,8 +70,8 @@ const Login = () => {
           </button>
 
           <div className="auth-header">
-            <h1>Welcome Back</h1>
-            <p>Sign in to your account</p>
+            <h1>Administrator Login</h1>
+            <p>Sign in to your administrator account</p>
           </div>
 
           {error && (
@@ -133,9 +118,15 @@ const Login = () => {
 
           <div className="auth-footer">
             <p>
-              Don't have an account?{' '}
-              <Link to="/signup" className="auth-link">
+              Don't have an administrator account?{' '}
+              <Link to="/administrator/signup" className="auth-link">
                 Sign Up
+              </Link>
+            </p>
+            <p style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--text-gray)' }}>
+              Regular users should use{' '}
+              <Link to="/login" className="auth-link" style={{ fontSize: '0.85rem' }}>
+                user login
               </Link>
             </p>
           </div>
@@ -145,5 +136,5 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default AdminLogin;
 

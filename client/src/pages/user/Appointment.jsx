@@ -2,44 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import axios from 'axios';
+import { useAppDispatch, useAuth, useAppointments, useCachedServices, useCachedDoctors } from '../../store/hooks';
+import { fetchAppointments, createAppointment } from '../../store/slices/appointmentSlice';
+import { fetchServices, fetchDoctors } from '../../store/slices/publicDataSlice';
 import './Appointment.css';
-
-// Services data
-const servicesData = [
-  { id: 'ivf', title: 'In Vitro Fertilization (IVF)' },
-  { id: 'iui', title: 'Intrauterine Insemination (IUI)' },
-  { id: 'icsi', title: 'Intracytoplasmic Sperm Injection' },
-  { id: 'egg-freezing', title: 'Egg Freezing & Preservation' },
-  { id: 'genetic-testing', title: 'Genetic Testing & Screening' },
-  { id: 'donor-program', title: 'Egg & Sperm Donor Program' },
-  { id: 'male-fertility', title: 'Male Fertility Treatment' },
-  { id: 'surrogacy', title: 'Surrogacy Services' },
-  { id: 'fertility-surgery', title: 'Fertility Surgery' }
-];
-
-// Mock doctors data (as array for easier filtering)
-const doctorsDataArray = [
-  { id: 1, name: 'Dr. Sarah Cameron', specialty: 'Senior Embryologist', services: ['ivf', 'egg-freezing'] },
-  { id: 2, name: 'Dr. Michael Ross', specialty: 'Infertility Specialist', services: ['ivf', 'iui'] },
-  { id: 3, name: 'Dr. Emily Chen', specialty: 'Reproductive Geneticist', services: ['genetic-testing', 'donor-program'] },
-  { id: 4, name: 'Dr. James Wilson', specialty: 'Urologist & Andrologist', services: ['icsi', 'male-fertility'] },
-  { id: 5, name: 'Dr. Anita Roy', specialty: 'Gynecologist & Obstetrician', services: ['iui', 'ivf'] },
-  { id: 6, name: 'Dr. Robert Kim', specialty: 'Fertility Surgeon', services: ['fertility-surgery', 'ivf'] },
-  { id: 7, name: 'Dr. Lisa Thompson', specialty: 'Reproductive Endocrinologist', services: ['surrogacy', 'donor-program'] },
-  { id: 8, name: 'Dr. David Martinez', specialty: 'IVF Laboratory Director', services: ['ivf', 'icsi', 'egg-freezing'] }
-];
-
-// Legacy format for backward compatibility
-const doctorsData = {
-  1: doctorsDataArray[0],
-  2: doctorsDataArray[1],
-  3: doctorsDataArray[2],
-  4: doctorsDataArray[3],
-  5: doctorsDataArray[4],
-  6: doctorsDataArray[5],
-  7: doctorsDataArray[6],
-  8: doctorsDataArray[7]
-};
 
 // Available time slots
 const timeSlots = [
@@ -51,13 +17,17 @@ const timeSlots = [
 const Appointment = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const doctorId = parseInt(searchParams.get('doctorId'));
+  const dispatch = useAppDispatch();
+  const doctorId = searchParams.get('doctorId'); // Keep as string for MongoDB ObjectId
   
-  const [appointments, setAppointments] = useState([]);
+  // Redux state
+  const { isAuthenticated, user } = useAuth();
+  const { appointments, loading: appointmentsLoading } = useAppointments();
+  const { services: servicesData, loading: servicesLoading, isCached: servicesCached } = useCachedServices();
+  const { doctors: doctorsData, loading: doctorsLoading, isCached: doctorsCached } = useCachedDoctors();
+  
   const [filter, setFilter] = useState('all'); // all, upcoming, past
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const isLoadingData = servicesLoading || doctorsLoading;
   
   // Booking form state (only used when doctorId is present)
   const [formData, setFormData] = useState({
@@ -88,31 +58,34 @@ const Appointment = () => {
   const watchedDoctorId = watch('doctorId');
   const watchedDate = watch('appointmentDate');
 
+  // Fetch services and doctors from database using Redux
+  useEffect(() => {
+    dispatch(fetchServices());
+    dispatch(fetchDoctors());
+  }, [dispatch]);
+
   // Check authentication and fetch appointments
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      setIsAuthenticated(true);
-      setUser(JSON.parse(userData));
-      fetchAppointments(token);
-    } else {
+    if (!isAuthenticated || !user) {
       navigate('/login?redirect=/appointment' + (doctorId ? `?doctorId=${doctorId}` : ''));
       return;
     }
+    
+    // Fetch appointments using Redux
+    dispatch(fetchAppointments());
 
-    // If doctorId is present, set up booking form
-    if (doctorId) {
-      if (doctorsData[doctorId]) {
-        setSelectedDoctor(doctorsData[doctorId]);
+    // If doctorId is present, set up booking form (wait for doctors to load)
+    if (doctorId && doctorsData.length > 0) {
+      const doctor = doctorsData.find(doc => doc._id === doctorId || doc.doctorId === doctorId);
+      if (doctor) {
+        setSelectedDoctor(doctor);
         const today = new Date().toISOString().split('T')[0];
         setFormData(prev => ({ ...prev, appointmentDate: today }));
       } else {
         setError('Doctor not found');
       }
     }
-  }, [doctorId, navigate]);
+  }, [doctorId, navigate, doctorsData, isAuthenticated, user, dispatch]);
 
   // Update available time slots based on date
   const updateAvailableTimes = useCallback((selectedDate) => {
@@ -148,8 +121,11 @@ const Appointment = () => {
 
   // Filter doctors when service changes
   useEffect(() => {
-    if (watchedServiceId) {
-      const filtered = doctorsDataArray.filter(doc => doc.services.includes(watchedServiceId));
+    if (watchedServiceId && doctorsData.length > 0) {
+      // Filter doctors whose services array includes the selected serviceId
+      const filtered = doctorsData.filter(doc => 
+        doc.services && doc.services.includes(watchedServiceId)
+      );
       setAvailableDoctors(filtered);
       // Reset doctor selection when service changes
       setValue('doctorId', '');
@@ -158,7 +134,7 @@ const Appointment = () => {
       setAvailableDoctors([]);
       setValue('doctorId', '');
     }
-  }, [watchedServiceId, setValue]);
+  }, [watchedServiceId, setValue, doctorsData]);
 
   // Update available times when doctor and date are selected
   useEffect(() => {
@@ -198,36 +174,39 @@ const Appointment = () => {
 
       // Get selected service and doctor details
       const selectedService = servicesData.find(s => s.id === data.serviceId);
-      const selectedDoctor = doctorsDataArray.find(d => d.id === parseInt(data.doctorId));
+      const selectedDoctor = doctorsData.find(d => 
+        d._id === data.doctorId || d.doctorId === data.doctorId
+      );
+
+      if (!selectedService || !selectedDoctor) {
+        setError('Selected service or doctor not found');
+        setIsSubmitting(false);
+        return;
+      }
 
       const appointmentData = {
-        doctorId: selectedDoctor.id,
+        doctorId: selectedDoctor._id || selectedDoctor.doctorId,
         doctorName: selectedDoctor.name,
         serviceId: selectedService.id,
         serviceName: selectedService.title,
         appointmentDate: data.appointmentDate,
         appointmentTime: data.appointmentTime,
-        amount: 0,
+        amount: selectedService.price || 0,
         notes: ''
       };
 
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/create`,
-        appointmentData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (response.data.success) {
+      const result = await dispatch(createAppointment(appointmentData));
+      
+      if (createAppointment.fulfilled.match(result)) {
         // Close modal and refresh appointments
         setShowBookingModal(false);
         reset();
         setAvailableDoctors([]);
         setAvailableTimes([]);
-        fetchAppointments(token);
+        // Refresh appointments list
+        dispatch(fetchAppointments());
+      } else {
+        setError(result.payload || 'Failed to book appointment. Please try again.');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to book appointment. Please try again.');
@@ -236,29 +215,7 @@ const Appointment = () => {
     }
   };
 
-  // Fetch appointments from API
-  const fetchAppointments = async (token) => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/my-appointments`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setAppointments(data.appointments || []);
-      } else {
-        console.error('Failed to fetch appointments:', data.message);
-      }
-    } catch (err) {
-      console.error('Error fetching appointments:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Appointments are now fetched via Redux in useEffect
 
   // Filter appointments
   const filteredAppointments = appointments.filter(apt => {
@@ -321,36 +278,30 @@ const Appointment = () => {
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          doctorId: selectedDoctor.id,
-          doctorName: selectedDoctor.name,
-          serviceId: selectedDoctor.services[0] || '',
-          serviceName: selectedDoctor.services[0] || '',
-          appointmentDate: formData.appointmentDate,
-          appointmentTime: formData.appointmentTime,
-          amount: 500,
-          notes: formData.notes
-        })
-      });
+      const appointmentData = {
+        doctorId: selectedDoctor._id || selectedDoctor.doctorId,
+        doctorName: selectedDoctor.name,
+        serviceId: selectedDoctor.services && selectedDoctor.services[0] ? selectedDoctor.services[0] : '',
+        serviceName: selectedDoctor.services && selectedDoctor.services[0] 
+          ? servicesData.find(s => s.id === selectedDoctor.services[0])?.title || selectedDoctor.services[0]
+          : '',
+        appointmentDate: formData.appointmentDate,
+        appointmentTime: formData.appointmentTime,
+        amount: selectedDoctor.consultationFee || 500,
+        notes: formData.notes
+      };
 
-      const data = await response.json();
+      const result = await dispatch(createAppointment(appointmentData));
 
-      if (data.success) {
+      if (createAppointment.fulfilled.match(result)) {
         // Refresh appointments list
-        await fetchAppointments(token);
+        dispatch(fetchAppointments());
         // Clear form and remove doctorId from URL
         setFormData({ appointmentDate: '', appointmentTime: '', notes: '' });
         navigate('/appointment', { replace: true });
         setSelectedDoctor(null);
       } else {
-        setError(data.message || 'Failed to create appointment');
+        setError(result.payload || 'Failed to create appointment');
       }
     } catch (err) {
       console.error('Appointment creation error:', err);
@@ -578,7 +529,7 @@ const Appointment = () => {
         {/* Appointments List */}
         {!doctorId && (
           <section className="appointments-list-section animate-on-scroll slide-up delay-200">
-            {isLoading ? (
+            {appointmentsLoading ? (
               <div className="loading-state">
                 <div className="loading-spinner"></div>
                 <p>Loading appointments...</p>
@@ -700,11 +651,17 @@ const Appointment = () => {
                   className="form-select"
                 >
                   <option value="">Select a service</option>
-                  {servicesData.map(service => (
-                    <option key={service.id} value={service.id}>
-                      {service.title}
-                    </option>
-                  ))}
+                  {isLoadingData ? (
+                    <option value="" disabled>Loading services...</option>
+                  ) : servicesData.length > 0 ? (
+                    servicesData.map(service => (
+                      <option key={service.id || service._id} value={service.id || service._id}>
+                        {service.title}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No services available</option>
+                  )}
                 </select>
                 {errors.serviceId && (
                   <span className="error-text">{errors.serviceId.message}</span>
@@ -723,13 +680,15 @@ const Appointment = () => {
                   <option value="">
                     {!watchedServiceId 
                       ? 'Please select a service first' 
+                      : isLoadingData
+                      ? 'Loading doctors...'
                       : availableDoctors.length === 0 
                       ? 'No doctors available for this service'
                       : 'Select a doctor'}
                   </option>
                   {availableDoctors.map(doctor => (
-                    <option key={doctor.id} value={doctor.id}>
-                      {doctor.name} - {doctor.specialty}
+                    <option key={doctor._id || doctor.doctorId} value={doctor._id || doctor.doctorId}>
+                      {doctor.name} - {doctor.specialty || 'General Practitioner'}
                     </option>
                   ))}
                 </select>

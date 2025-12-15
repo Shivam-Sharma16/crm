@@ -2,7 +2,11 @@ const express = require('express')
 const cors = require('cors')
 const connectDB = require('./db/db')
 const authRoutes = require('./routes/auth.routes')
+const adminRoutes = require('./routes/admin.routes')
 const appointmentRoutes = require('./routes/appointment.routes')
+const doctorRoutes = require('./routes/doctor.routes')
+const adminEntitiesRoutes = require('./routes/admin-entities.routes')
+const publicRoutes = require('./routes/public.routes')
 
 const app = express()
 
@@ -25,7 +29,11 @@ app.use(express.urlencoded({ extended: true }))
 
 // Routes
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', adminRoutes)
 app.use('/api/appointments', appointmentRoutes)
+app.use('/api/doctor', doctorRoutes)
+app.use('/api/admin-entities', adminEntitiesRoutes)
+app.use('/api/public', publicRoutes)
 
 // Health check route
 app.get('/api/health', (req, res) => {
