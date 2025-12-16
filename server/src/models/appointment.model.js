@@ -7,13 +7,13 @@ const appointmentSchema = new mongoose.Schema({
     required: [true, 'User ID is required']
   },
   doctorId: {
-    type: mongoose.Schema.Types.Mixed, // Can be ObjectId or String/Number for backward compatibility
-    required: false // Made optional to support both old and new format
+    type: mongoose.Schema.Types.Mixed,
+    required: false
   },
   doctorUserId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: false // Optional for backward compatibility
+    required: false
   },
   doctorName: {
     type: String,
@@ -52,22 +52,22 @@ const appointmentSchema = new mongoose.Schema({
   notes: {
     type: String,
     default: ''
+  },
+  // NEW FIELD
+  prescription: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true
 });
 
-// Add indexes for better query performance
-appointmentSchema.index({ userId: 1 }); // Index for user's appointments
-appointmentSchema.index({ doctorUserId: 1 }); // Index for doctor's appointments
-appointmentSchema.index({ doctorId: 1 }); // Index for doctor profile lookups
-appointmentSchema.index({ appointmentDate: 1, appointmentTime: 1 }); // Compound index for date/time sorting
-appointmentSchema.index({ status: 1 }); // Index for filtering by status
+appointmentSchema.index({ userId: 1 });
+appointmentSchema.index({ doctorUserId: 1 });
+appointmentSchema.index({ doctorId: 1 });
+appointmentSchema.index({ appointmentDate: 1, appointmentTime: 1 });
+appointmentSchema.index({ status: 1 });
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);
 
 module.exports = Appointment;
-
-
-
-

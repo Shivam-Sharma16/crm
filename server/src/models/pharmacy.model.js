@@ -45,3 +45,6 @@ const Pharmacy = mongoose.model('Pharmacy', pharmacySchema);
 module.exports = Pharmacy;
 
 
+
+
+

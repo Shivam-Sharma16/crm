@@ -1,29 +1,31 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const Appointment = require('../models/appointment.model');
 const User = require('../models/user.model');
-const { verifyToken } = require('../middleware/auth.middleware');
-
 const Doctor = require('../models/doctor.model');
+const { verifyToken } = require('../middleware/auth.middleware');
+const imagekit = require('../utils/imagekit'); // Ensure you have created this utils file
 
-// Route to get all doctors (public route) - returns detailed doctor profiles
+// Configure Multer for memory storage (buffer)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
+
+// Route to get all doctors (public route)
 router.get('/', async (req, res) => {
   try {
     const { serviceId } = req.query;
-    
-    // Add cache headers for better performance (5 minutes cache)
     res.set('Cache-Control', 'public, max-age=300');
     
-    // Build query
     let query = {};
-    
-    // Filter by service if serviceId is provided
     if (serviceId) {
       query.services = { $in: [serviceId] };
     }
     
-    // Find all doctors with populated user data
-    // Use lean() and select() for better performance
     const doctors = await Doctor.find(query)
       .select('doctorId userId name email phone specialty experience education services availability successRate patientsCount image bio consultationFee')
       .populate('userId', 'name email phone role')
@@ -49,9 +51,6 @@ router.get('/', async (req, res) => {
 // Route to get all appointments for a doctor
 router.get('/appointments', verifyToken, async (req, res) => {
   try {
-    console.log('Doctor appointments request - User:', req.user);
-    
-    // Check if user is a doctor
     if (req.user.role !== 'doctor') {
       return res.status(403).json({
         success: false,
@@ -59,39 +58,22 @@ router.get('/appointments', verifyToken, async (req, res) => {
       });
     }
 
-    // Get the doctor's user ID from the JWT token (middleware sets req.user.id)
     const doctorUserId = req.user.id || req.user.userId;
     
     if (!doctorUserId) {
-      console.error('No doctor user ID found in request');
       return res.status(400).json({
         success: false,
         message: 'Invalid user information'
       });
     }
     
-    console.log('Fetching appointments for doctor userId:', doctorUserId);
-    
-    // Verify the user is a doctor
-    const doctor = await User.findById(doctorUserId);
-    if (!doctor || doctor.role !== 'doctor') {
-      return res.status(404).json({
-        success: false,
-        message: 'Doctor not found'
-      });
-    }
-
-    // Find appointments by doctorUserId (this ensures only this doctor's appointments are shown)
-    // Use lean() and select() for better performance
     const appointments = await Appointment.find({ 
       doctorUserId: doctorUserId
     })
-    .select('userId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes')
+    .select('userId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes prescription')
     .populate('userId', 'name email phone')
     .sort({ appointmentDate: 1, appointmentTime: 1 })
     .lean();
-
-    console.log(`Found ${appointments.length} appointments for doctor ${doctor.name}`);
 
     res.json({
       success: true,
@@ -107,5 +89,96 @@ router.get('/appointments', verifyToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+// Update Doctor Availability
+router.put('/availability', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
 
+    const { availability } = req.body;
+    const userId = req.user.id || req.user.userId;
+
+    const doctor = await Doctor.findOneAndUpdate(
+      { userId: userId },
+      { $set: { availability } },
+      { new: true }
+    );
+
+    if (!doctor) return res.status(404).json({ success: false, message: 'Doctor profile not found' });
+
+    res.json({ success: true, message: 'Availability updated', availability: doctor.availability });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Update failed', error: error.message });
+  }
+});
+
+// Cancel Appointment
+router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
+    
+    const appointmentId = req.params.id;
+    const appointment = await Appointment.findById(appointmentId);
+
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+    
+    if (appointment.doctorUserId.toString() !== (req.user.id || req.user.userId)) {
+      return res.status(403).json({ message: 'Not authorized to cancel this appointment' });
+    }
+
+    appointment.status = 'cancelled';
+    await appointment.save();
+
+    res.json({ success: true, message: 'Appointment cancelled', appointment });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Cancellation failed', error: error.message });
+  }
+});
+
+// UPDATED: Add Prescription (supports File Upload to '/crm' folder)
+router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
+
+    const { status, diagnosis } = req.body;
+    const appointmentId = req.params.id;
+
+    const appointment = await Appointment.findOne({ 
+      _id: appointmentId, 
+      doctorUserId: req.user.id || req.user.userId 
+    });
+
+    if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
+
+    // Handle File Upload to ImageKit
+    if (req.file) {
+      try {
+        const result = await imagekit.upload({
+          file: req.file.buffer,
+          fileName: `prescription_${appointmentId}_${Date.now()}_${req.file.originalname}`,
+          folder: '/crm', // <--- UPDATED: Uploads to the 'crm' folder in ImageKit
+          tags: ['prescription', appointmentId]
+        });
+        
+        appointment.prescription = result.url;
+      } catch (uploadError) {
+        console.error('ImageKit Upload Error:', uploadError);
+        return res.status(500).json({ success: false, message: 'Failed to upload prescription file' });
+      }
+    }
+
+    if (status) appointment.status = status;
+    
+    if (diagnosis) {
+        appointment.notes = diagnosis; 
+    }
+
+    await appointment.save();
+    
+    res.json({ success: true, message: 'Prescription uploaded successfully', appointment });
+  } catch (error) {
+    console.error('Prescription update error:', error);
+    res.status(500).json({ success: false, message: 'Update failed', error: error.message });
+  }
+});
+
+module.exports = router;

@@ -38,3 +38,6 @@ const Reception = mongoose.model('Reception', receptionSchema);
 module.exports = Reception;
 
 
+
+
+

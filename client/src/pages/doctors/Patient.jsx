@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAuth, useDoctors } from '../../store/hooks';
-import { fetchDoctorAppointments } from '../../store/slices/doctorSlice';
+import { fetchDoctorAppointments, cancelAppointment, updateAvailability } from '../../store/slices/doctorSlice';
 import { logout } from '../../store/slices/authSlice';
 import './Patient.css';
 
@@ -10,14 +10,13 @@ const Patient = () => {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { appointments, loading, error } = useDoctors();
+  const [showAvailability, setShowAvailability] = useState(false);
 
   useEffect(() => {
-    // Check if user is doctor
     if (!user || user.role !== 'doctor') {
       navigate('/');
       return;
     }
-    // Fetch appointments using Redux
     dispatch(fetchDoctorAppointments());
   }, [navigate, user, dispatch]);
 
@@ -26,92 +25,102 @@ const Patient = () => {
     navigate('/');
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+  const handleRowClick = (appointmentId) => {
+    navigate(`/doctor/patient/${appointmentId}`);
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return 'status-confirmed';
-      case 'completed':
-        return 'status-completed';
-      case 'cancelled':
-        return 'status-cancelled';
-      default:
-        return 'status-pending';
+  const handleCancel = (e, id) => {
+    e.stopPropagation(); // Prevent row click
+    if(window.confirm('Are you sure you want to cancel this appointment?')) {
+      dispatch(cancelAppointment(id));
     }
   };
 
-  if (!user) {
-    return null;
-  }
+  // Sort: Date ASC, then Time ASC (Assuming HH:mm format)
+  const sortedAppointments = [...appointments].sort((a, b) => {
+    const dateA = new Date(a.appointmentDate).getTime();
+    const dateB = new Date(b.appointmentDate).getTime();
+    if (dateA !== dateB) return dateA - dateB;
+    // Simple string compare for "HH:mm" works for 24h format
+    return a.appointmentTime.localeCompare(b.appointmentTime);
+  });
 
   return (
     <div className="patient-page">
       <div className="patient-container">
-        {/* Header */}
         <div className="patient-header">
           <div>
-            <h1>My Patients</h1>
-            <p>View all appointments and patient information</p>
+            <h1>Doctor Dashboard</h1>
+            <p>Manage appointments and patient prescriptions</p>
           </div>
           <div className="patient-user-info">
-            <span>Welcome, Dr. {user.name}</span>
-            <button onClick={handleLogout} className="logout-btn">
-              Logout
+             {/* Simple toggle for availability UI (implement full form in modal ideally) */}
+            <button className="availability-btn" onClick={() => setShowAvailability(!showAvailability)}>
+              {showAvailability ? 'Hide Schedule' : 'Set Availability'}
             </button>
+            <span style={{margin: '0 10px'}}>Dr. {user?.name}</span>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
           </div>
         </div>
 
-        {error && (
-          <div className="error-message">
-            {error}
+        {/* Placeholder for Availability Form */}
+        {showAvailability && (
+          <div className="availability-panel">
+            <h3>Update Working Hours</h3>
+            <p><i>(Feature implementation: Create a form mapping days to start/end times and dispatch updateAvailability)</i></p>
+            {/* Example Dispatch:
+                dispatch(updateAvailability({
+                    monday: { available: true, startTime: "09:00", endTime: "17:00" },
+                    ...
+                }))
+            */}
           </div>
         )}
 
-        {/* Appointments List */}
+        {error && <div className="error-message">{error}</div>}
+
         <div className="appointments-card">
-          <h2>Appointments</h2>
+          <h2>Upcoming Appointments</h2>
           {loading ? (
-            <div className="loading-message">Loading appointments...</div>
-          ) : appointments.length === 0 ? (
+            <div className="loading-message">Loading...</div>
+          ) : sortedAppointments.length === 0 ? (
             <div className="empty-message">No appointments found</div>
           ) : (
             <div className="appointments-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Patient Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Service</th>
                     <th>Date</th>
                     <th>Time</th>
+                    <th>Patient</th>
+                    <th>Service</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {appointments.map((appointment) => (
-                    <tr key={appointment._id || appointment.id}>
+                  {sortedAppointments.map((app) => (
+                    <tr 
+                        key={app._id} 
+                        onClick={() => handleRowClick(app._id)}
+                        className="clickable-row"
+                    >
+                      <td>{new Date(app.appointmentDate).toLocaleDateString()}</td>
+                      <td>{app.appointmentTime}</td>
+                      <td>{app.userId?.name || 'N/A'}</td>
+                      <td>{app.serviceName}</td>
                       <td>
-                        {appointment.userId?.name || 'N/A'}
+                        <span className={`status-badge ${app.status}`}>{app.status}</span>
                       </td>
-                      <td>{appointment.userId?.email || 'N/A'}</td>
-                      <td>{appointment.userId?.phone || '-'}</td>
-                      <td>{appointment.serviceName || 'N/A'}</td>
-                      <td>{formatDate(appointment.appointmentDate)}</td>
-                      <td>{appointment.appointmentTime}</td>
                       <td>
-                        <span className={`status-badge ${getStatusBadgeClass(appointment.status)}`}>
-                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                        </span>
+                        {app.status === 'pending' || app.status === 'confirmed' ? (
+                          <button 
+                            className="cancel-btn"
+                            onClick={(e) => handleCancel(e, app._id)}
+                          >
+                            Cancel
+                          </button>
+                        ) : '-'}
                       </td>
                     </tr>
                   ))}
@@ -126,5 +135,3 @@ const Patient = () => {
 };
 
 export default Patient;
-
-

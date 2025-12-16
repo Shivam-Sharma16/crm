@@ -23,6 +23,7 @@ import AdminPharmacy from '../pages/admin/AdminPharmacy';
 import AdminReception from '../pages/admin/AdminReception';
 import AdminServices from '../pages/admin/AdminServices';
 import Patient from '../pages/doctors/Patient';
+import DoctorPatientDetails from '../pages/doctors/DoctorPatientDetails';
 
 export const MainRoutes = () => {
   return (
@@ -176,6 +177,26 @@ export const MainRoutes = () => {
             </ProtectedRoute>
           } 
         />
+
+        {/* Doctor Dashboard */}
+<Route 
+  path="/doctor/patients" 
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <Patient />
+    </ProtectedRoute>
+  } 
+/>
+
+{/* NEW: Doctor Patient Details / Prescription Page */}
+<Route 
+  path="/doctor/patient/:appointmentId" 
+  element={
+    <ProtectedRoute allowedRoles={['doctor']}>
+      <DoctorPatientDetails />
+    </ProtectedRoute>
+  } 
+/>
         
         {/* Doctor Dashboard - Protected for doctor only */}
         <Route 

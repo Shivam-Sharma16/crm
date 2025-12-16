@@ -180,3 +180,6 @@ const authSlice = createSlice({
 export const { logout, clearError, updateUser } = authSlice.actions;
 export default authSlice.reducer;
 
+
+
+
