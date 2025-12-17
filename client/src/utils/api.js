@@ -242,7 +242,15 @@ export const publicAPI = {
   },
 };
 
+// Upload API functions
+export const uploadAPI = {
+  // Upload multiple images
+  uploadImages: async (formData) => {
+    // Note: Content-Type multipart/form-data is set automatically by axios when passing FormData
+    const response = await apiClient.post('/api/upload/images', formData);
+    return response.data;
+  },
+};
+
 // Export the apiClient for other API calls if needed
 export default apiClient;
-
-

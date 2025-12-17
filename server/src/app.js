@@ -7,6 +7,7 @@ const appointmentRoutes = require('./routes/appointment.routes')
 const doctorRoutes = require('./routes/doctor.routes')
 const adminEntitiesRoutes = require('./routes/admin-entities.routes')
 const publicRoutes = require('./routes/public.routes')
+const uploadRoutes = require('./routes/upload.routes')
 
 const app = express()
 
@@ -28,12 +29,15 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Routes
-app.use('/api/auth', authRoutes)
-app.use('/api/admin', adminRoutes)
-app.use('/api/appointments', appointmentRoutes)
-app.use('/api/doctor', doctorRoutes)
-app.use('/api/admin-entities', adminEntitiesRoutes)
-app.use('/api/public', publicRoutes)
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/doctor', doctorRoutes);
+app.use('/api/admin-entities', adminEntitiesRoutes);
+app.use('/api/public', publicRoutes);
+
+app.use('/api/upload', uploadRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

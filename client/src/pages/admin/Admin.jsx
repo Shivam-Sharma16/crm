@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../utils/api';
+import ImageUploader from '../../components/ImageUploader'; // Import the new Uploader
 import '../administration/Administrator.css';
 
 const Admin = () => {
@@ -113,6 +114,15 @@ const Admin = () => {
             {success}
           </div>
         )}
+
+        {/* NEW: Image Upload Section */}
+        <div className="admin-card" style={{ marginBottom: '20px' }}>
+          <h2>Media Gallery Upload</h2>
+          <p style={{ marginBottom: '15px', color: '#666' }}>
+            Upload multiple images or PDFs to the CRM gallery.
+          </p>
+          <ImageUploader />
+        </div>
 
         {/* Users List */}
         <div className="admin-card">
@@ -244,4 +254,3 @@ const Admin = () => {
 };
 
 export default Admin;
-
