@@ -7,8 +7,8 @@ const appointmentSchema = new mongoose.Schema({
     required: [true, 'User ID is required']
   },
   doctorId: {
-    type: mongoose.Schema.Types.Mixed,
-    required: false
+    type: mongoose.Schema.Types.Mixed, // Storing as Mixed to handle both String (legacy) and ObjectId
+    required: true
   },
   doctorUserId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -53,20 +53,36 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // NEW FIELD
   prescription: {
     type: String,
     default: ''
-  }
+  },
+  // Array for multiple prescriptions
+  prescriptions: [{
+    url: { type: String, required: true },
+    fileId: { type: String },
+    name: { type: String },
+    uploadedAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });
 
+// --- EXISTING INDEXES ---
 appointmentSchema.index({ userId: 1 });
 appointmentSchema.index({ doctorUserId: 1 });
-appointmentSchema.index({ doctorId: 1 });
-appointmentSchema.index({ appointmentDate: 1, appointmentTime: 1 });
 appointmentSchema.index({ status: 1 });
+
+// --- NEW: PROPER BOOKING AUTHENTICATION INDEX ---
+// This Unique Compound Index prevents duplicate bookings at the DB level.
+// It says: "A doctor cannot have two appointments at the same date and time, UNLESS the status is 'cancelled'."
+appointmentSchema.index(
+  { doctorId: 1, appointmentDate: 1, appointmentTime: 1 }, 
+  { 
+    unique: true, 
+    partialFilterExpression: { status: { $ne: 'cancelled' } } 
+  }
+);
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);
 

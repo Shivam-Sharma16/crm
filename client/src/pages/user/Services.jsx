@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAppDispatch, useCachedServices, useCachedDoctors } from '../../store/hooks';
 import { fetchServices, fetchDoctors } from '../../store/slices/publicDataSlice';
 import './Services.css';
@@ -78,6 +79,23 @@ const timeSlots = [
   '16:00', '16:30', '17:00', '17:30'
 ];
 
+// Helper function moved outside component to be stable
+const getSpecialtyFromServices = (services) => {
+  if (!services || services.length === 0) return 'General Practitioner';
+  const specialtyMap = {
+    'ivf': 'IVF Specialist',
+    'iui': 'Infertility Specialist',
+    'icsi': 'Reproductive Specialist',
+    'egg-freezing': 'Fertility Preservation Specialist',
+    'genetic-testing': 'Reproductive Geneticist',
+    'donor-program': 'Reproductive Endocrinologist',
+    'male-fertility': 'Urologist & Andrologist',
+    'surrogacy': 'Reproductive Endocrinologist',
+    'fertility-surgery': 'Fertility Surgeon'
+  };
+  return specialtyMap[services[0]] || 'Fertility Specialist';
+};
+
 const Services = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -109,30 +127,15 @@ const Services = () => {
     dispatch(fetchDoctors());
   }, [dispatch]);
   
-  // --- FIXED: Function defined BEFORE it is used ---
-  const getSpecialtyFromServices = (services) => {
-    if (!services || services.length === 0) return 'General Practitioner';
-    const specialtyMap = {
-      'ivf': 'IVF Specialist',
-      'iui': 'Infertility Specialist',
-      'icsi': 'Reproductive Specialist',
-      'egg-freezing': 'Fertility Preservation Specialist',
-      'genetic-testing': 'Reproductive Geneticist',
-      'donor-program': 'Reproductive Endocrinologist',
-      'male-fertility': 'Urologist & Andrologist',
-      'surrogacy': 'Reproductive Endocrinologist',
-      'fertility-surgery': 'Fertility Surgeon'
-    };
-    return specialtyMap[services[0]] || 'Fertility Specialist';
-  };
-  
-  // Map doctors to expected format
-  const allDoctors = allDoctorsData.map((doctor) => ({
-    id: doctor._id || doctor.doctorId,
-    name: doctor.name,
-    specialty: getSpecialtyFromServices(doctor.services || []),
-    services: doctor.services || []
-  }));
+  // FIX: Memoize allDoctors to prevent infinite re-renders
+  const allDoctors = useMemo(() => {
+    return allDoctorsData.map((doctor) => ({
+      id: doctor._id || doctor.doctorId,
+      name: doctor.name,
+      specialty: getSpecialtyFromServices(doctor.services || []),
+      services: doctor.services || []
+    }));
+  }, [allDoctorsData]);
   
   // Filter doctors when service changes
   useEffect(() => {
@@ -248,15 +251,6 @@ const Services = () => {
       doctorId: '', // Reset doctor when service changes
       appointmentTime: '' // Reset time when service changes
     });
-
-    // Filter doctors by selected service
-    if (selectedServiceId) {
-      const filtered = allDoctors.filter(doc => doc.services && doc.services.includes(selectedServiceId));
-      setAvailableDoctors(filtered);
-    } else {
-      setAvailableDoctors([]);
-    }
-    setAvailableTimes([]);
   };
 
   // Handle doctor selection

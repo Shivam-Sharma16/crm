@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
-import { updatePrescription } from '../../store/slices/doctorSlice';
+import { updatePrescription, deletePrescription } from '../../store/slices/doctorSlice';
 import './Patient.css';
 
 const DoctorPatientDetails = () => {
@@ -23,12 +23,10 @@ const DoctorPatientDetails = () => {
     }
   }, [appointment]);
 
-  // Handle File Selection
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       setFile(selectedFile);
-      // Create local preview URL
       const objectUrl = URL.createObjectURL(selectedFile);
       setPreview(objectUrl);
     }
@@ -41,33 +39,51 @@ const DoctorPatientDetails = () => {
     }
 
     setIsUploading(true);
-    
-    // Create FormData object
     const formData = new FormData();
-    if (file) {
-      formData.append('prescriptionFile', file);
-    }
+    if (file) formData.append('prescriptionFile', file);
     formData.append('diagnosis', notes);
     formData.append('status', 'completed');
 
     try {
-      await dispatch(updatePrescription({ 
-        appointmentId, 
-        formData 
-      })).unwrap();
-      
-      alert('Prescription uploaded successfully!');
-      navigate('/doctor/patients');
+      await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
+      alert('Updated successfully!');
+      setFile(null);
+      setPreview(null);
     } catch (err) {
-      alert('Failed to upload: ' + err);
+      alert('Failed to update: ' + err);
     } finally {
       setIsUploading(false);
     }
   };
 
+  const handleDeletePrescription = async (prescriptionId) => {
+      if(!window.confirm("Are you sure you want to delete this prescription?")) return;
+      
+      try {
+          await dispatch(deletePrescription({ appointmentId, prescriptionId })).unwrap();
+          alert("Prescription removed.");
+      } catch (err) {
+          alert("Failed to remove: " + err);
+      }
+  };
+
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
   const isPdf = (url) => url?.toLowerCase().endsWith('.pdf');
+
+  // Helper to get prescriptions list (handling legacy data + new array)
+  const getPrescriptionsList = () => {
+      if (appointment.prescriptions && appointment.prescriptions.length > 0) {
+          return appointment.prescriptions;
+      }
+      // Fallback for old data structure
+      if (appointment.prescription) {
+          return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
+      }
+      return [];
+  };
+
+  const prescriptionsList = getPrescriptionsList();
 
   return (
     <div className="patient-page">
@@ -79,30 +95,56 @@ const DoctorPatientDetails = () => {
             
             <div className="patient-info-grid">
                 <div><strong>Patient:</strong> {appointment.userId?.name}</div>
-                <div><strong>Email:</strong> {appointment.userId?.email}</div>
                 <div><strong>Service:</strong> {appointment.serviceName}</div>
                 <div><strong>Date:</strong> {new Date(appointment.appointmentDate).toDateString()}</div>
             </div>
 
-            {/* Existing Prescription View */}
-            {appointment.prescription && (
-              <div className="existing-prescription" style={{marginTop: '20px', padding: '10px', background: '#f5f5f5'}}>
-                <h4>Current Prescription:</h4>
-                {isPdf(appointment.prescription) ? (
-                  <a href={appointment.prescription} target="_blank" rel="noopener noreferrer" className="view-pdf-btn">
-                    📄 View Prescription PDF
-                  </a>
+            <hr style={{margin: '20px 0'}} />
+
+            {/* Prescriptions List */}
+            <div className="prescriptions-section">
+                <h3>Prescriptions</h3>
+                {prescriptionsList.length === 0 ? (
+                    <p style={{color: '#666', fontStyle: 'italic'}}>No prescriptions uploaded yet.</p>
                 ) : (
-                  <img src={appointment.prescription} alt="Prescription" style={{maxWidth: '100%', maxHeight: '400px'}} />
+                    <div className="prescriptions-list" style={{display: 'flex', flexWrap: 'wrap', gap: '15px'}}>
+                        {prescriptionsList.map((item, index) => (
+                            <div key={item._id || index} className="prescription-item" style={{border: '1px solid #ddd', padding: '10px', borderRadius: '8px', width: '200px'}}>
+                                {isPdf(item.url) ? (
+                                    <div className="pdf-icon" style={{fontSize: '40px', textAlign: 'center'}}>📄</div>
+                                ) : (
+                                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                        <img src={item.url} alt="Prescription" style={{width: '100%', height: '150px', objectFit: 'cover', borderRadius: '4px'}} />
+                                    </a>
+                                )}
+                                
+                                <div style={{marginTop: '10px', fontSize: '12px'}}>
+                                    <div style={{fontWeight: 'bold', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                        {item.name || 'Prescription'}
+                                    </div>
+                                    <div style={{display: 'flex', justifyContent: 'space-between', gap: '5px'}}>
+                                        <a href={item.url} target="_blank" rel="noopener noreferrer" style={{color: '#1976d2', textDecoration: 'none'}}>View</a>
+                                        {item._id !== 'legacy' && (
+                                            <button 
+                                                onClick={() => handleDeletePrescription(item._id)}
+                                                style={{background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer'}}
+                                            >
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 )}
-              </div>
-            )}
+            </div>
 
             <hr style={{margin: '20px 0'}} />
 
             {/* Upload Section */}
+            <h3>Add New Prescription</h3>
             <div className="form-group">
-                <label>Upload Prescription (Image or PDF)</label>
                 <input 
                   type="file" 
                   accept="image/*,.pdf"
@@ -111,22 +153,21 @@ const DoctorPatientDetails = () => {
                 />
             </div>
 
-            {/* File Preview */}
             {preview && file && !file.type.includes('pdf') && (
               <div className="preview-container" style={{marginBottom: '15px'}}>
-                <p>Preview:</p>
+                <p>New Upload Preview:</p>
                 <img src={preview} alt="Preview" style={{maxWidth: '200px', border: '1px solid #ddd'}} />
               </div>
             )}
 
             <div className="form-group">
-                <label>Diagnosis / Additional Notes</label>
+                <label>Diagnosis / Notes</label>
                 <textarea 
                     rows="4"
                     style={{width: '100%', padding: '10px'}}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Enter diagnosis notes (optional)..."
+                    placeholder="Enter diagnosis notes..."
                 />
             </div>
 
@@ -136,7 +177,7 @@ const DoctorPatientDetails = () => {
               disabled={isUploading}
               style={{opacity: isUploading ? 0.7 : 1}}
             >
-              {isUploading ? 'Uploading & Saving...' : 'Save Prescription & Complete'}
+              {isUploading ? 'Uploading...' : 'Upload & Update'}
             </button>
         </div>
       </div>

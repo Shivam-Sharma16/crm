@@ -1,19 +1,20 @@
 // client/src/App.jsx
-import React, { useEffect } from 'react';
-import { MainRoutes } from './routes/Mainroutes';
-import Lenis from 'lenis';
-import './App.css';
+import React, { useEffect } from 'react'
+import { MainRoutes } from './routes/Mainroutes'
+import Lenis from 'lenis'
+import './App.css'
+// If you installed lenis via npm, you might need this css import depending on version:
+// import 'lenis/dist/lenis.css' 
 
-function App() {
+const App = () => {
   
+  // This useEffect handles smooth scrolling and does NOT interfere with routing
   useEffect(() => {
-    // Initialize Lenis for global smooth scrolling
     const lenis = new Lenis({
       duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Custom easing for "professional" feel
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), 
       direction: 'vertical',
       smooth: true,
-      smoothTouch: false, // Default is false, set to true if you want smooth scroll on mobile touch
     });
 
     function raf(time) {
@@ -23,17 +24,16 @@ function App() {
 
     requestAnimationFrame(raf);
 
-    // Cleanup on unmount
     return () => {
       lenis.destroy();
     };
   }, []);
 
   return (
-    <div className="App">
-      <MainRoutes />
-    </div>
-  );
+   <div style={{ width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
+     <MainRoutes />
+   </div>
+  )
 }
 
-export default App;
+export default App

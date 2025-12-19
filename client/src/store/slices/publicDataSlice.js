@@ -1,20 +1,13 @@
+// client/src/store/slices/publicDataSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { publicAPI } from '../../utils/api';
 
-// Async thunks with caching
+// Fetch Services - CACHE DISABLED
 export const fetchServices = createAsyncThunk(
   'publicData/fetchServices',
   async (_, { rejectWithValue, getState }) => {
     try {
-      const state = getState();
-      const { lastFetched } = state.publicData.services;
-      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-      
-      // Return cached data if still valid
-      if (lastFetched && Date.now() - lastFetched < CACHE_DURATION) {
-        return { cached: true, data: state.publicData.services.data };
-      }
-      
+      // Direct API call without cache check
       const response = await publicAPI.getServices();
       if (response.success) {
         return { cached: false, data: response.services || [] };
@@ -26,20 +19,12 @@ export const fetchServices = createAsyncThunk(
   }
 );
 
+// Fetch Doctors - CACHE DISABLED
 export const fetchDoctors = createAsyncThunk(
   'publicData/fetchDoctors',
   async (serviceId = null, { rejectWithValue, getState }) => {
     try {
-      const state = getState();
-      const cacheKey = serviceId || 'all';
-      const cached = state.publicData.doctors.cache[cacheKey];
-      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-      
-      // Return cached data if still valid
-      if (cached && Date.now() - cached.lastFetched < CACHE_DURATION) {
-        return { cached: true, data: cached.data, serviceId };
-      }
-      
+      // Direct API call without cache check
       const response = await publicAPI.getDoctors(serviceId);
       if (response.success) {
         return { cached: false, data: response.doctors || [], serviceId };
@@ -64,7 +49,7 @@ const publicDataSlice = createSlice({
       data: [],
       loading: false,
       error: null,
-      cache: {}, // Cache by serviceId
+      cache: {}, 
     },
   },
   reducers: {
@@ -90,10 +75,8 @@ const publicDataSlice = createSlice({
       })
       .addCase(fetchServices.fulfilled, (state, action) => {
         state.services.loading = false;
-        if (!action.payload.cached) {
-          state.services.data = action.payload.data;
-          state.services.lastFetched = Date.now();
-        }
+        state.services.data = action.payload.data;
+        state.services.lastFetched = Date.now();
         state.services.error = null;
       })
       .addCase(fetchServices.rejected, (state, action) => {
@@ -107,21 +90,13 @@ const publicDataSlice = createSlice({
       })
       .addCase(fetchDoctors.fulfilled, (state, action) => {
         state.doctors.loading = false;
+        // Even though we don't use cache for reading, we update it for consistency
         const cacheKey = action.payload.serviceId || 'all';
-        
-        if (!action.payload.cached) {
-          // Update cache
-          state.doctors.cache[cacheKey] = {
-            data: action.payload.data,
-            lastFetched: Date.now(),
-          };
-        }
-        
-        // Update current data
-        state.doctors.data = action.payload.cached
-          ? state.doctors.cache[cacheKey].data
-          : action.payload.data;
-        
+        state.doctors.cache[cacheKey] = {
+          data: action.payload.data,
+          lastFetched: Date.now(),
+        };
+        state.doctors.data = action.payload.data;
         state.doctors.error = null;
       })
       .addCase(fetchDoctors.rejected, (state, action) => {
@@ -133,4 +108,3 @@ const publicDataSlice = createSlice({
 
 export const { clearServices, clearDoctors, clearError: clearPublicDataError } = publicDataSlice.actions;
 export default publicDataSlice.reducer;
-

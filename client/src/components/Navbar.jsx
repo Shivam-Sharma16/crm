@@ -4,7 +4,6 @@ import { useAppDispatch, useAuth } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
 import './Navbar.css';
 
-
 const Navbar = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -34,7 +33,6 @@ const Navbar = () => {
             Home
           </NavLink>
          
-          
           {/* Show user links only for regular users (not admin, not doctor) */}
           {user?.role !== 'admin' && user?.role !== 'doctor' && (
             <>
@@ -166,7 +164,8 @@ const Navbar = () => {
                   >
                     <span className="dropdown-icon">🔐</span>
                     Login
-                    <img src="./" alt="" srcset="" />
+                    {/* FIXED: Removed invalid/empty 'srcset' attribute */}
+                    <img src="./" alt="" />
                   </NavLink>
                   <NavLink 
                     to="/signup" 
@@ -188,4 +187,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;  
+export default Navbar;

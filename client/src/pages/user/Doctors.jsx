@@ -26,7 +26,8 @@ const Doctors = () => {
   // Map doctors to expected format
   const doctors = doctorsData.map((doctor, index) => ({
     id: doctor._id || doctor.doctorId,
-    name: doctor.name,
+    // Automatically add 'Dr.' prefix if not present
+    name: doctor.name.toLowerCase().startsWith('dr.') ? doctor.name : `Dr. ${doctor.name}`,
     specialty: doctor.specialty || getSpecialtyFromServices(doctor.services || []),
     services: doctor.services || [],
     experience: doctor.experience || 'Experienced',
@@ -148,10 +149,14 @@ const Doctors = () => {
                       <span className="doctor-emoji">{doctor.image}</span>
                     </div>
                     <div className="image-overlay"></div>
-                    <div className="success-badge">
-                      <span className="success-rate">{doctor.successRate}</span>
-                      <span className="success-label">Success Rate</span>
-                    </div>
+                    
+                    {/* REMOVED: Success Rate Badge 
+                       <div className="success-badge">
+                         <span className="success-rate">{doctor.successRate}</span>
+                         <span className="success-label">Success Rate</span>
+                       </div>
+                    */}
+
                   </div>
 
                   {/* Doctor Info */}
@@ -236,7 +241,3 @@ const Doctors = () => {
 };
 
 export default Doctors;
-
-
-
-

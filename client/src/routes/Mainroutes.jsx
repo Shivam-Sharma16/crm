@@ -1,8 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom'; // No BrowserRouter here (it's in main.jsx)
 
+// Components
 import Navbar from '../components/Navbar';
 import Home from '../pages/Home';
+
+// User Pages
 import Services from '../pages/user/Services';
 import Doctors from '../pages/user/Doctors';
 import Appointment from '../pages/user/Appointment';
@@ -12,46 +15,61 @@ import Dashboard from '../pages/user/Dashboard';
 import Pharmacy from '../pages/user/Pharmacy';
 import Login from '../pages/user/Login';
 import Signup from '../pages/user/Signup';
+
+// Doctor Pages
 import Patient from '../pages/doctors/Patient';
 import DoctorPatientDetails from '../pages/doctors/DoctorPatientDetails';
 
+// Admin Pages (These were missing!)
+import Admin from '../pages/admin/Admin';
+import AdminDoctors from '../pages/admin/AdminDoctors';
+import AdminLabs from '../pages/admin/AdminLabs';
+import AdminPharmacy from '../pages/admin/AdminPharmacy';
+import AdminReception from '../pages/admin/AdminReception';
+import AdminServices from '../pages/admin/AdminServices';
+
+// Admin Auth
+import AdminLogin from '../pages/administration/AdminLogin';
+import AdminSignup from '../pages/administration/AdminSignup';
+
 export const MainRoutes = () => {
   return (
-    <Router>
+    <>
       <Navbar />
+      
       <Routes>
+        {/* --- Public/User Routes --- */}
         <Route path="/" element={<Home />} />
-        
-        {/* Services Page */}
         <Route path="/services" element={<Services />} />
-        
-        {/* Doctors Page (Direct Access) */}
         <Route path="/doctors" element={<Doctors />} />
-        
-        {/* CRITICAL FIX: Dynamic Route for Service Specific Doctors */}
-        {/* This handles /services/ivf/doctors, /services/iui/doctors, etc. */}
         <Route path="/services/:serviceId/doctors" element={<Doctors />} />
         
         <Route path="/appointment" element={<Appointment />} />
         <Route path="/appointment/success" element={<AppointmentSuccess />} />
-        
-        {/* Lab Reports Page */}
         <Route path="/lab-reports" element={<LabReports />} />
-        
-        {/* Dashboard Page */}
         <Route path="/dashboard" element={<Dashboard />} />
-        
-        {/* Pharmacy Page */}
         <Route path="/pharmacy" element={<Pharmacy />} />
         
-        {/* Authentication Pages */}
+        {/* --- Authentication --- */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         
-        {/* Doctor Routes */}
+        {/* --- Doctor Routes --- */}
         <Route path="/doctor/patients" element={<Patient />} />
         <Route path="/doctor/patients/:appointmentId" element={<DoctorPatientDetails />} />
+
+        {/* --- Admin Routes (FIXED) --- */}
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/signup" element={<AdminSignup />} />
+        
+        {/* These specific routes were causing the "No route matched" error */}
+        <Route path="/admin/doctors" element={<AdminDoctors />} />
+        <Route path="/admin/labs" element={<AdminLabs />} />
+        <Route path="/admin/pharmacy" element={<AdminPharmacy />} />
+        <Route path="/admin/reception" element={<AdminReception />} />
+        <Route path="/admin/services" element={<AdminServices />} />
       </Routes>
-    </Router>
+    </>
   );
 };

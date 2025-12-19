@@ -44,14 +44,12 @@ export const updateAvailability = createAsyncThunk(
   }
 );
 
-// Update Prescription
+// Update Prescription (Upload)
 export const updatePrescription = createAsyncThunk(
   'doctors/updatePrescription',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
     try {
-      // FIX: Explicitly set Content-Type to undefined. 
-      // This forces the browser to detect FormData and set 'multipart/form-data; boundary=...'
-      // If we don't do this, a default 'application/json' might block the upload.
+      // Content-Type: undefined allows the browser to automatically set the boundary
       const config = {
         headers: {
           'Content-Type': undefined 
@@ -71,6 +69,22 @@ export const updatePrescription = createAsyncThunk(
       return rejectWithValue(error.response?.data?.message || 'Failed to update prescription');
     }
   }
+);
+
+// Delete Prescription
+export const deletePrescription = createAsyncThunk(
+    'doctors/deletePrescription',
+    async ({ appointmentId, prescriptionId }, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.delete(
+                `/api/doctor/appointments/${appointmentId}/prescriptions/${prescriptionId}`
+            );
+            if (response.data.success) return response.data.appointment;
+            return rejectWithValue(response.data.message);
+        } catch (error) {
+            return rejectWithValue(error.response?.data?.message || 'Failed to delete prescription');
+        }
+    }
 );
 
 const doctorSlice = createSlice({
@@ -111,6 +125,14 @@ const doctorSlice = createSlice({
 
       // Update Prescription
       .addCase(updatePrescription.fulfilled, (state, action) => {
+        const index = state.appointments.findIndex(app => app._id === action.payload._id);
+        if (index !== -1) {
+          state.appointments[index] = action.payload;
+        }
+      })
+      
+      // Delete Prescription
+      .addCase(deletePrescription.fulfilled, (state, action) => {
         const index = state.appointments.findIndex(app => app._id === action.payload._id);
         if (index !== -1) {
           state.appointments[index] = action.payload;
