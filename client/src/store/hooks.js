@@ -30,47 +30,31 @@ export const useServices = () => {
   return useAppSelector((state) => state.services);
 };
 
-// Selector hooks with memoization
+// FIXED: Simplified Data Hooks to prevent "undefined" crashes
 export const useCachedServices = () => {
-  const { data, loading, error, lastFetched } = useAppSelector(
-    (state) => state.publicData.services
+  const { services, loading, error } = useAppSelector(
+    (state) => state.publicData
   );
   
-  return useMemo(
-    () => ({
-      services: data,
-      loading,
-      error,
-      isCached: lastFetched && Date.now() - lastFetched < 5 * 60 * 1000,
-    }),
-    [data, loading, error, lastFetched]
-  );
+  // Return structure compatible with your components
+  return {
+    services: services || [],
+    loading,
+    error,
+    isCached: false // Caching handled by browser/network layer for simplicity
+  };
 };
 
 export const useCachedDoctors = (serviceId = null) => {
-  const { data, loading, error, cache } = useAppSelector(
-    (state) => state.publicData.doctors
+  const { doctors, loading, error } = useAppSelector(
+    (state) => state.publicData
   );
   
-  const cacheKey = serviceId || 'all';
-  const cached = cache[cacheKey];
-  
-  return useMemo(
-    () => ({
-      doctors: data,
-      loading,
-      error,
-      isCached: cached && Date.now() - cached.lastFetched < 5 * 60 * 1000,
-    }),
-    [data, loading, error, cached]
-  );
+  // Return structure compatible with your components
+  return {
+    doctors: doctors || [],
+    loading,
+    error,
+    isCached: false
+  };
 };
-
-
-
-
-
-
-
-
-
