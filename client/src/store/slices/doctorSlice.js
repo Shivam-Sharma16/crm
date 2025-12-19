@@ -1,3 +1,4 @@
+// client/src/store/slices/doctorSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/api';
 
@@ -48,12 +49,25 @@ export const updatePrescription = createAsyncThunk(
   'doctors/updatePrescription',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
     try {
-      // Axios automatically sets 'Content-Type': 'multipart/form-data' when sending FormData
-      const response = await apiClient.patch(`/api/doctor/appointments/${appointmentId}/prescription`, formData);
+      // FIX: Explicitly set Content-Type to undefined. 
+      // This forces the browser to detect FormData and set 'multipart/form-data; boundary=...'
+      // If we don't do this, a default 'application/json' might block the upload.
+      const config = {
+        headers: {
+          'Content-Type': undefined 
+        }
+      };
+
+      const response = await apiClient.patch(
+          `/api/doctor/appointments/${appointmentId}/prescription`, 
+          formData,
+          config
+      );
       
       if (response.data.success) return response.data.appointment;
       return rejectWithValue(response.data.message);
     } catch (error) {
+      console.error("Prescription Upload Error:", error);
       return rejectWithValue(error.response?.data?.message || 'Failed to update prescription');
     }
   }

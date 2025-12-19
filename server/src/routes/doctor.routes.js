@@ -1,3 +1,4 @@
+// server/src/routes/doctor.routes.js
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -137,6 +138,20 @@ router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
 // UPDATED: Add Prescription (supports File Upload to '/crm' folder)
 router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
   try {
+    // --- DEBUG LOGS ---
+    console.log('--- Prescription Upload Request ---');
+    console.log('Request Headers Content-Type:', req.headers['content-type']);
+    console.log('File detected by Multer:', req.file ? 'YES' : 'NO');
+    if (req.file) {
+        console.log('File Details:', {
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size
+        });
+    }
+    console.log('Body fields detected:', Object.keys(req.body));
+    // ------------------
+
     if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
 
     const { status, diagnosis } = req.body;
@@ -171,7 +186,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
         return res.status(500).json({ success: false, message: 'Failed to upload prescription file', error: uploadError.message });
       }
     } else {
-        console.log('No file received for upload.');
+        console.warn('WARNING: No file received for upload.');
     }
 
     if (status) appointment.status = status;

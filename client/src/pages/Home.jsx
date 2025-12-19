@@ -1,3 +1,4 @@
+// client/src/pages/Home.jsx
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Home.css';
@@ -6,6 +7,7 @@ const Home = () => {
   const navigate = useNavigate();
 
   // Logic to handle scroll animations
+  // NOTE: Lenis is now handled globally in App.jsx
   useEffect(() => {
     const observerOptions = {
       root: null,
@@ -38,54 +40,54 @@ const Home = () => {
         <div className="hero-bg-shape"></div>
         <div className="content-wrapper hero-grid">
           <div className="hero-text animate-on-scroll slide-up">
-            <span className="badge">Welcome to MediCare Prime</span>
+            <span className="badge">#1 Fertility Center</span>
             <h1>
-              Next Generation <br />
-              <span className="text-gradient">Medical Care</span>
+              Begin Your Journey to <br />
+              <span className="text-gradient">Parenthood</span>
             </h1>
             <p className="hero-subtext">
-              Experience the future of healthcare. We combine advanced technology 
-              with compassionate care to ensure your well-being is always prioritized.
+              Realize your dream of family with world-class IVF technology, 
+              personalized fertility plans, and compassionate care at every step.
             </p>
             <div className="hero-buttons">
               <button 
                 className="btn btn-primary"
                 onClick={() => navigate('/services')}
               >
-                Book Consultation
+                Book Free Consultation
               </button>
               <button 
                 className="btn btn-secondary"
                 onClick={() => navigate('/services')}
               >
-                View Services
+                Explore Treatments
               </button>
             </div>
             
             <div className="stats-row">
               <div className="stat-item">
-                <strong>15k+</strong>
-                <span>Happy Patients</span>
+                <strong>10k+</strong>
+                <span>Successful Births</span>
               </div>
               <div className="stat-item">
-                <strong>4.9</strong>
-                <span>Average Rating</span>
+                <strong>98%</strong>
+                <span>Satisfaction Rate</span>
               </div>
             </div>
           </div>
 
           <div className="hero-visual animate-on-scroll fade-in delay-200">
-            {/* CSS-based Abstract Medical Visualization */}
-            <div className="visual-card main-card">
-              <div className="card-icon">🩺</div>
-              <h3>Expert Diagnosis</h3>
-              <p>Precision AI-driven insights.</p>
+            {/* Professional IVF Visualization */}
+            <div className="visual-card main-card slow-pulse">
+              <div className="card-icon">🧬</div>
+              <h3>Advanced Embryology</h3>
+              <p>State-of-the-art genetic screening.</p>
             </div>
             <div className="visual-card floating-card-1">
-              <span>❤️</span> 24/7 Support
+              <span>👶</span> Dreams Realized
             </div>
             <div className="visual-card floating-card-2">
-              <span>🛡️</span> Top Specialists
+              <span>🔬</span> Precision Labs
             </div>
           </div>
         </div>
@@ -95,25 +97,25 @@ const Home = () => {
       <section className="section features-section">
         <div className="content-wrapper">
           <div className="section-header animate-on-scroll slide-up">
-            <h2>Why Choose Us</h2>
-            <p>Redefining standards in modern healthcare.</p>
+            <h2>Why Choose Our IVF Center</h2>
+            <p>Combining science and empathy to deliver the highest success rates.</p>
           </div>
           
           <div className="features-grid">
-            <div className="feature-card animate-on-scroll slide-up delay-100">
-              <div className="icon-box">🔬</div>
-              <h3>Advanced Lab</h3>
-              <p>State-of-the-art diagnostic centers ensuring 100% precision in reports.</p>
+            <div className="feature-card color-animate animate-on-scroll slide-up delay-100">
+              <div className="icon-box">🎯</div>
+              <h3>High Success Rates</h3>
+              <p>Our advanced protocols consistently deliver success rates well above the national average.</p>
             </div>
-            <div className="feature-card animate-on-scroll slide-up delay-200">
-              <div className="icon-box">👨‍⚕️</div>
-              <h3>Qualified Doctors</h3>
-              <p>A team of world-renowned specialists dedicated to your recovery.</p>
+            <div className="feature-card color-animate animate-on-scroll slide-up delay-200">
+              <div className="icon-box">🤝</div>
+              <h3>Compassionate Care</h3>
+              <p>A dedicated team of counselors and specialists to support you emotionally and physically.</p>
             </div>
-            <div className="feature-card animate-on-scroll slide-up delay-300">
-              <div className="icon-box">🚑</div>
-              <h3>Emergency Care</h3>
-              <p>Rapid response teams and ambulance services available 24/7.</p>
+            <div className="feature-card color-animate animate-on-scroll slide-up delay-300">
+              <div className="icon-box">💡</div>
+              <h3>Latest Technology</h3>
+              <p>Equipped with Time-Lapse Imaging and Laser Assisted Hatching for better outcomes.</p>
             </div>
           </div>
         </div>
@@ -123,19 +125,26 @@ const Home = () => {
       <section className="section services-section">
         <div className="content-wrapper">
           <div className="section-header animate-on-scroll slide-up">
-            <h2>Our Medical Services</h2>
-            <p>Comprehensive treatments for you and your family.</p>
+            <h2>Fertility Treatments</h2>
+            <p>Comprehensive solutions tailored to your unique biology.</p>
           </div>
 
           <div className="services-grid">
-            {['Cardiology', 'Neurology', 'Dental Care', 'Pediatrics', 'Eye Care', 'Orthopedics'].map((service, index) => (
-              <div key={index} className={`service-card animate-on-scroll slide-up delay-${(index % 3) * 100}`}>
+            {[
+              { title: 'In Vitro Fertilization (IVF)', desc: 'Advanced assisted reproductive technology for complex fertility cases.' },
+              { title: 'IUI (Insemination)', desc: 'A less invasive first step for many couples trying to conceive.' },
+              { title: 'ICSI', desc: 'Intracytoplasmic Sperm Injection for severe male factor infertility.' },
+              { title: 'Egg Freezing', desc: 'Empower your future by preserving your fertility today.' },
+              { title: 'Male Infertility', desc: 'Comprehensive diagnosis and treatments for male reproductive health.' },
+              { title: 'Genetic Testing', desc: 'PGT-A and PGT-M testing to ensure a healthy pregnancy.' }
+            ].map((service, index) => (
+              <div key={index} className={`service-card color-animate animate-on-scroll slide-up delay-${(index % 3) * 100}`}>
                 <div className="service-icon-wrapper">
-                  <div className="dot"></div>
+                  <div className="dot-pulse"></div>
                 </div>
-                <h3>{service}</h3>
-                <p>Leading specialists providing top-tier {service.toLowerCase()} treatments.</p>
-                <a href="#learn-more" className="learn-more">Learn More &rarr;</a>
+                <h3>{service.title}</h3>
+                <p>{service.desc}</p>
+                <span className="learn-more" onClick={() => navigate('/services')}>View Details &rarr;</span>
               </div>
             ))}
           </div>
@@ -146,17 +155,22 @@ const Home = () => {
       <section className="section doctors-section">
         <div className="content-wrapper">
           <div className="section-header animate-on-scroll slide-up">
-            <h2>Meet Our Specialists</h2>
-            <p>Trust your health with the best hands in the industry.</p>
+            <h2>Meet Our Fertility Experts</h2>
+            <p>Renowned specialists dedicated to making your dream come true.</p>
           </div>
 
           <div className="doctors-grid">
-            {[1, 2, 3, 4].map((doc, idx) => (
+            {[
+              { name: "Dr. Elena Gilbert", role: "Senior Embryologist" },
+              { name: "Dr. Stefan Salvatore", role: "IVF Specialist" },
+              { name: "Dr. Caroline Forbes", role: "Reproductive Surgeon" },
+              { name: "Dr. Alaric Saltzman", role: "Andrologist" }
+            ].map((doc, idx) => (
               <div key={idx} className="doctor-card animate-on-scroll fade-in">
                 <div className="doctor-img-placeholder"></div>
                 <div className="doctor-info">
-                  <h3>Dr. Alex Cameron</h3>
-                  <span className="specialty">Senior Surgeon</span>
+                  <h3>{doc.name}</h3>
+                  <span className="specialty">{doc.role}</span>
                   <div className="social-dots">
                     <span>•</span><span>•</span><span>•</span>
                   </div>
@@ -170,17 +184,17 @@ const Home = () => {
       {/* --- TESTIMONIALS SECTION --- */}
       <section className="section testimonials-section">
         <div className="content-wrapper">
-          <h2 className="animate-on-scroll slide-up">Patient Success Stories</h2>
+          <h2 className="animate-on-scroll slide-up">Stories of Hope</h2>
           <div className="testimonials-row animate-on-scroll slide-up delay-200">
             <div className="testimonial-card">
               <div className="quote-icon">“</div>
-              <p>The level of care and technology used at MediCare Prime is unmatched. I felt safe and cared for every step of the way.</p>
-              <h4>- Sarah Jenkins</h4>
+              <p>After 5 years of trying, this center gave us our miracle baby. The doctors were patient and the technology is top-notch.</p>
+              <h4>- The Williams Family</h4>
             </div>
             <div className="testimonial-card">
               <div className="quote-icon">“</div>
-              <p>Professional, clean, and incredibly efficient. The doctors took the time to explain everything to me clearly.</p>
-              <h4>- Michael Ross</h4>
+              <p>Professionalism mixed with genuine care. They explained every step of the IVF process clearly. Highly recommended.</p>
+              <h4>- Sarah & James</h4>
             </div>
           </div>
         </div>
@@ -189,8 +203,8 @@ const Home = () => {
       {/* --- CTA SECTION --- */}
       <section className="cta-section animate-on-scroll zoom-in">
         <div className="cta-content">
-          <h2>Ready to Prioritize Your Health?</h2>
-          <p>Book an appointment today and experience the difference.</p>
+          <h2>Ready to Start Your Family?</h2>
+          <p>Book a confidential consultation with our fertility experts today.</p>
           <button 
             className="btn btn-white"
             onClick={() => navigate('/services')}

@@ -26,7 +26,8 @@ const Patient = () => {
   };
 
   const handleRowClick = (appointmentId) => {
-    navigate(`/doctor/patient/${appointmentId}`);
+    // FIX: Changed 'patient' to 'patients' to match MainRoutes.jsx
+    navigate(`/doctor/patients/${appointmentId}`);
   };
 
   const handleCancel = (e, id) => {
