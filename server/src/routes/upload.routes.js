@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const imagekit = require('../utils/imagekit'); // Your existing ImageKit util
+const imagekit = require('../utils/imagekit'); // Correctly imports the instance now
+const UploadedFile = require('../models/uploadedFile.model'); // Import the new model
 
-// Configure Multer for memory storage (buffer)
+// Configure Multer for memory storage (Required for ImageKit)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Accept images and PDFs
     if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
@@ -19,55 +19,48 @@ const upload = multer({
   }
 });
 
-// Generic Route to Upload Multiple Images/Files
-// Usage: POST /api/upload/images
-// Body: FormData with key "images" (multiple files) and optional "captions"
+// Route: POST /api/upload/images
 router.post('/images', upload.array("images", 10), async (req, res) => {
   try {
     const files = req.files;
-    const { captions } = req.body; // Optional captions array
-
+    
     if (!files || files.length === 0) {
       return res.status(400).json({ success: false, message: "No files uploaded" });
     }
 
-    // Handle single or multiple captions
-    const captionsArray = Array.isArray(captions) ? captions : [captions];
+    const uploadedResults = [];
 
-    const uploadedFiles = [];
-
-    // Iterate through all uploaded files
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const caption = captionsArray[i] || file.originalname;
-
-      // Upload to ImageKit
+    // Loop through all files
+    for (const file of files) {
+      // 1. Upload to ImageKit
       const result = await imagekit.upload({
-        file: file.buffer, // Buffer from multer
+        file: file.buffer, // The file buffer from RAM
         fileName: `crm_${Date.now()}_${file.originalname}`,
-        folder: '/crm',    // Upload to your CRM folder
+        folder: "/prescriptions", // Organized folder
         tags: ['crm_upload', file.mimetype]
       });
 
-      // Create a result object (similar to your songObject)
-      const fileObject = {
-        name: file.originalname,
-        caption: caption,
+      // 2. Save Metadata to MongoDB
+      const newFileRecord = new UploadedFile({
+        fileName: file.originalname,
         url: result.url,
         fileId: result.fileId,
-        type: file.mimetype,
-        size: result.size
-      };
+        mimeType: file.mimetype,
+        size: result.size,
+        tags: result.tags
+      });
 
-      uploadedFiles.push(fileObject);
+      await newFileRecord.save();
+
+      // Push to response array
+      uploadedResults.push(newFileRecord);
     }
 
-    // Return the uploaded data (You can save this to a 'Gallery' or 'Report' model here if needed)
     res.status(201).json({
       success: true,
-      message: "Images uploaded successfully",
-      count: uploadedFiles.length,
-      files: uploadedFiles,
+      message: "Images uploaded and metadata saved successfully",
+      count: uploadedResults.length,
+      files: uploadedResults, // Returns the MongoDB documents (including URLs)
     });
 
   } catch (error) {

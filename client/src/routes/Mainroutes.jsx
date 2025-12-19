@@ -12,6 +12,8 @@ import Dashboard from '../pages/user/Dashboard';
 import Pharmacy from '../pages/user/Pharmacy';
 import Login from '../pages/user/Login';
 import Signup from '../pages/user/Signup';
+import Patient from '../pages/doctors/Patient';
+import DoctorPatientDetails from '../pages/doctors/DoctorPatientDetails';
 
 export const MainRoutes = () => {
   return (
@@ -45,6 +47,10 @@ export const MainRoutes = () => {
         {/* Authentication Pages */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        
+        {/* Doctor Routes */}
+        <Route path="/doctor/patients" element={<Patient />} />
+        <Route path="/doctor/patients/:appointmentId" element={<DoctorPatientDetails />} />
       </Routes>
     </Router>
   );
