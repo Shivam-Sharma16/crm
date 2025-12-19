@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAppDispatch, useAuth, useAppointments, useCachedServices, useCachedDoctors } from '../../store/hooks';
 import { fetchAppointments, createAppointment } from '../../store/slices/appointmentSlice';
-import { fetchServices, fetchDoctors } from '../../store/slices/publicDataSlice';
+import { fetchServices, fetchDoctors, fetchBookedSlots } from '../../store/slices/publicDataSlice';
+import { useSelector } from 'react-redux'; // Add selector
 import './Appointment.css';
 
 // Base available time slots
@@ -22,8 +23,10 @@ const Appointment = () => {
   // Redux state
   const { isAuthenticated, user } = useAuth();
   const { appointments, loading: appointmentsLoading } = useAppointments();
-  const { services: servicesData, loading: servicesLoading } = useCachedServices();
-  const { doctors: doctorsData, loading: doctorsLoading } = useCachedDoctors();
+  const { services: servicesData } = useCachedServices();
+  const { doctors: doctorsData } = useCachedDoctors();
+  // Get bookedSlots from Redux store
+  const bookedSlots = useSelector((state) => state.publicData.bookedSlots);
   
   const [filter, setFilter] = useState('all'); 
   
@@ -82,6 +85,16 @@ const Appointment = () => {
     }
   }, [doctorId, navigate, doctorsData, isAuthenticated, user, dispatch]);
 
+  // NEW: Fetch booked slots when doctor or date changes
+  useEffect(() => {
+    const currentDoctorId = watchedDoctorId || (selectedDoctor ? (selectedDoctor._id || selectedDoctor.doctorId) : null);
+    const currentDate = watchedDate || formData.appointmentDate;
+
+    if (currentDoctorId && currentDate) {
+      dispatch(fetchBookedSlots({ doctorId: currentDoctorId, date: currentDate }));
+    }
+  }, [watchedDoctorId, watchedDate, selectedDoctor, formData.appointmentDate, dispatch]);
+
   const updateAvailableTimes = useCallback((selectedDate) => {
     if (!selectedDate) {
       setAvailableTimes([]);
@@ -89,6 +102,11 @@ const Appointment = () => {
     }
 
     let times = [...timeSlots];
+
+    // 0. Filter by Booked Slots (NEW)
+    if (bookedSlots && bookedSlots.length > 0) {
+      times = times.filter(t => !bookedSlots.includes(t));
+    }
 
     // 1. Filter by Doctor's Schedule
     const currentDoctorId = watchedDoctorId || (selectedDoctor ? (selectedDoctor._id || selectedDoctor.doctorId) : null);
@@ -102,9 +120,8 @@ const Appointment = () => {
             const dayName = days[dateObj.getDay()];
             const daySchedule = doctor.availability[dayName];
 
-            // FIX: Only block if schedule exists AND is strictly unavailable
             if (daySchedule && daySchedule.available === false) {
-                setAvailableTimes([]); // Doctor explicitly not working this day
+                setAvailableTimes([]); 
                 return;
             }
 
@@ -119,7 +136,6 @@ const Appointment = () => {
 
                 times = times.filter(t => {
                     const tMin = getMinutes(t);
-                    // Appointment must start strictly before end time
                     return tMin >= startMin && tMin < endMin;
                 });
             }
@@ -141,13 +157,12 @@ const Appointment = () => {
       times = times.filter(time => {
         const [hours, minutes] = time.split(':').map(Number);
         const timeInMinutes = hours * 60 + minutes;
-        // Buffer: Must be at least 30 mins from now
         return timeInMinutes > (currentTimeInMinutes + 30);
       });
     }
 
     setAvailableTimes(times);
-  }, [watchedDoctorId, doctorsData, selectedDoctor]);
+  }, [watchedDoctorId, doctorsData, selectedDoctor, bookedSlots]); // Add bookedSlots dependency
 
   useEffect(() => {
     if (watchedServiceId && doctorsData.length > 0) {
@@ -166,7 +181,10 @@ const Appointment = () => {
   useEffect(() => {
     if (watchedDate) {
       updateAvailableTimes(watchedDate);
-      setValue('appointmentTime', ''); // Clear time when date changes
+      // Only clear time if the currently selected time is now invalid
+      // But for simplicity, we clear it to force re-selection
+      // Check if watchedTime is still in availableTimes (requires a sync update, so clearing is safer)
+      // setValue('appointmentTime', ''); 
     } else {
       setAvailableTimes([]);
       setValue('appointmentTime', '');
@@ -178,7 +196,7 @@ const Appointment = () => {
       if (selectedDoctor && formData.appointmentDate) {
           updateAvailableTimes(formData.appointmentDate);
       }
-  }, [selectedDoctor, formData.appointmentDate, updateAvailableTimes]);
+  }, [selectedDoctor, formData.appointmentDate, updateAvailableTimes, bookedSlots]); // Add bookedSlots
 
 
   const getMaxDate = () => {
@@ -194,7 +212,6 @@ const Appointment = () => {
   const onModalFormSubmit = async (data) => {
     setError('');
     
-    // Explicit Validation Check
     if (!data.appointmentTime) {
         setError('Please select a valid time slot.');
         return;
@@ -223,7 +240,7 @@ const Appointment = () => {
       }
 
       const appointmentData = {
-        doctorId: selectedDoc._id, // Prefer _id for DB linking
+        doctorId: selectedDoc._id, 
         doctorName: selectedDoc.name,
         serviceId: selectedService ? (selectedService.id || selectedService._id) : 'general',
         serviceName: selectedService ? (selectedService.title || selectedService.name) : 'General Consultation',
@@ -273,6 +290,7 @@ const Appointment = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
+    // If date changes, fetch slots again (handled by useEffect)
   };
 
   const handleBookingFormSubmit = async (e) => {
@@ -301,7 +319,7 @@ const Appointment = () => {
         : null;
 
       const appointmentData = {
-        doctorId: selectedDoctor._id, // Prefer _id for DB linking
+        doctorId: selectedDoctor._id, 
         doctorName: selectedDoctor.name,
         serviceId: selectedService ? selectedService.id : (selectedDoctor.services ? selectedDoctor.services[0] : ''),
         serviceName: selectedService ? selectedService.title : '',
@@ -463,9 +481,7 @@ const Appointment = () => {
                           </span>
                           {upcoming && <span className="upcoming-badge">Upcoming</span>}
                         </div>
-                        <div className={`payment-status payment-${appointment.paymentStatus}`}>
-                          {appointment.paymentStatus === 'paid' ? '✓ Paid' : '⏳ Pending'}
-                        </div>
+                       
                       </div>
 
                       <div className="appointment-card-body">
@@ -535,7 +551,7 @@ const Appointment = () => {
                      {availableTimes.map(t=><option key={t} value={t}>{t}</option>)}
                    </select>
                ) : (
-                   <p className="text-danger">No slots available for this date/doctor.</p>
+                   <p className="text-danger">No slots available for this date.</p>
                )}
                </div>
                

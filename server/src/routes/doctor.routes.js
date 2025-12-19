@@ -4,6 +4,7 @@ const router = express.Router();
 const multer = require('multer');
 const Appointment = require('../models/appointment.model');
 const Doctor = require('../models/doctor.model');
+const Service = require('../models/service.model'); 
 const { verifyToken } = require('../middleware/auth.middleware');
 const imagekit = require('../utils/imagekit');
 
@@ -14,19 +15,66 @@ const upload = multer({
   },
 });
 
-// GET Public Doctors List
+// GET Public Doctors List (With Enhanced Matching)
 router.get('/', async (req, res) => {
   try {
-    // FIX: COMPLETELY DISABLE CACHING
-    // This ensures that if an admin deletes/edits a doctor, the user sees it immediately.
+    // Disable caching for real-time updates
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
     
     const { serviceId } = req.query;
     let query = {};
+
     if (serviceId) {
-      query.services = { $in: [serviceId] };
+      // 1. Prepare Search Terms
+      // We start with the raw ID passed (e.g., "ivf" or "genetic-testing")
+      let searchTerms = [serviceId];
+      let searchRegexes = [];
+
+      // Create a "clean" version for text matching (e.g., "genetic-testing" -> "genetic testing")
+      const cleanName = serviceId.replace(/-/g, ' ');
+      searchRegexes.push(new RegExp(cleanName, 'i')); // Case-insensitive regex
+      
+      // 2. Smart Lookup: Find the Service Document
+      // This helps us find the "Real Title" if the ID is just a code
+      try {
+        const serviceDoc = await Service.findOne({
+          $or: [
+            { id: serviceId }, 
+            { title: { $regex: cleanName, $options: 'i' } },
+            // Check if valid ObjectId
+            { _id: (serviceId.match(/^[0-9a-fA-F]{24}$/) ? serviceId : null) }
+          ]
+        });
+
+        if (serviceDoc) {
+          // Add known aliases from the DB to our search list
+          searchTerms.push(serviceDoc.id);
+          searchTerms.push(serviceDoc.title);
+          if (serviceDoc._id) searchTerms.push(serviceDoc._id.toString());
+          
+          // Add the title to regex search as well
+          searchRegexes.push(new RegExp(serviceDoc.title, 'i'));
+        }
+      } catch (err) {
+        console.warn("Service lookup warning:", err.message);
+      }
+
+      // 3. Construct the "OR" Query
+      // We match if ANY of these conditions are true:
+      query = {
+        $or: [
+          // A. Exact match in the 'services' array
+          { services: { $in: searchTerms } },
+          
+          // B. Partial match in 'specialty' field (e.g., "IVF Specialist" matches "ivf")
+          { specialty: { $in: searchRegexes } },
+          
+          // C. Partial match in 'bio' (optional, but helpful)
+          { bio: { $in: searchRegexes } } 
+        ]
+      };
     }
     
     const doctors = await Doctor.find(query)
@@ -37,6 +85,7 @@ router.get('/', async (req, res) => {
     
     res.json({ success: true, doctors, count: doctors.length, cached: false });
   } catch (error) {
+    console.error("Error fetching doctors:", error);
     res.status(500).json({ success: false, message: 'Error fetching doctors', error: error.message });
   }
 });
@@ -62,7 +111,7 @@ router.get('/appointments', verifyToken, async (req, res) => {
   }
 });
 
-// UPDATE Availability (For Doctor Dashboard)
+// UPDATE Availability
 router.put('/availability', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
@@ -114,7 +163,6 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
     if (req.file) {
-        console.log('Uploading file to ImageKit...');
         const result = await imagekit.upload({
           file: req.file.buffer,
           fileName: `prescription_${appointmentId}_${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`,
@@ -124,7 +172,6 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
         });
 
         if (appointment.prescriptions) {
-            // Migration logic for old data
             if (appointment.prescription && appointment.prescriptions.length === 0) {
                  appointment.prescriptions.push({
                      url: appointment.prescription,
@@ -148,7 +195,6 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     await appointment.save();
     res.json({ success: true, message: 'Prescription updated', appointment });
   } catch (error) {
-    console.error('Prescription update error:', error);
     res.status(500).json({ success: false, message: 'Update failed', error: error.message });
   }
 });
@@ -180,6 +226,74 @@ router.delete('/appointments/:id/prescriptions/:prescriptionId', verifyToken, as
     } catch (error) {
         res.status(500).json({ success: false, message: 'Delete failed', error: error.message });
     }
+});
+
+// GET Doctor's Patients
+router.get('/patients', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ message: 'Access denied. Only doctors can access this route.' });
+    }
+
+    const doctorUserId = req.user.id || req.user.userId;
+
+    const appointments = await Appointment.find({ doctorUserId })
+      .populate('userId', 'name email phone')
+      .sort({ appointmentDate: -1 });
+
+    const uniquePatientsMap = new Map();
+
+    appointments.forEach(app => {
+      if (app.userId) {
+        const patientId = app.userId._id.toString();
+        if (!uniquePatientsMap.has(patientId)) {
+          uniquePatientsMap.set(patientId, {
+            _id: app.userId._id,
+            name: app.userId.name,
+            email: app.userId.email,
+            phone: app.userId.phone,
+            lastAppointmentDate: app.appointmentDate,
+            lastAppointmentId: app._id,
+            totalAppointments: 1
+          });
+        } else {
+          const patient = uniquePatientsMap.get(patientId);
+          patient.totalAppointments += 1;
+        }
+      }
+    });
+
+    const patients = Array.from(uniquePatientsMap.values());
+    res.json({ success: true, patients });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching patients', error: error.message });
+  }
+});
+
+// GET Booked Slots
+router.get('/:doctorId/booked-slots', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ success: false, message: 'Date is required' });
+    }
+
+    const queryDate = new Date(date);
+    
+    const appointments = await Appointment.find({
+      $or: [{ doctorId: doctorId }, { doctorUserId: doctorId }],
+      appointmentDate: queryDate,
+      status: { $ne: 'cancelled' }
+    }).select('appointmentTime');
+
+    const bookedSlots = appointments.map(app => app.appointmentTime);
+
+    res.json({ success: true, bookedSlots });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching slots', error: error.message });
+  }
 });
 
 module.exports = router;

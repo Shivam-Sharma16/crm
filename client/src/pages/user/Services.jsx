@@ -5,73 +5,6 @@ import { useAppDispatch, useCachedServices, useCachedDoctors } from '../../store
 import { fetchServices, fetchDoctors } from '../../store/slices/publicDataSlice';
 import './Services.css';
 
-// IVF-related services data
-const servicesData = [
-  {
-    id: 'ivf',
-    title: 'In Vitro Fertilization (IVF)',
-    description: 'Advanced assisted reproductive technology with high success rates. Our state-of-the-art lab ensures optimal embryo development.',
-    icon: '🔬',
-    color: '#14C38E'
-  },
-  {
-    id: 'iui',
-    title: 'Intrauterine Insemination (IUI)',
-    description: 'A less invasive fertility treatment option. Perfect for couples seeking a natural approach with medical assistance.',
-    icon: '💉',
-    color: '#00FFAB'
-  },
-  {
-    id: 'icsi',
-    title: 'Intracytoplasmic Sperm Injection',
-    description: 'Precision technique for male infertility. Direct sperm injection into eggs for improved fertilization success.',
-    icon: '🔬',
-    color: '#14C38E'
-  },
-  {
-    id: 'egg-freezing',
-    title: 'Egg Freezing & Preservation',
-    description: 'Preserve your fertility for the future. Advanced cryopreservation technology with excellent survival rates.',
-    icon: '❄️',
-    color: '#00FFAB'
-  },
-  {
-    id: 'genetic-testing',
-    title: 'Genetic Testing & Screening',
-    description: 'Comprehensive pre-implantation genetic testing to ensure healthy embryos and reduce genetic disorders.',
-    icon: '🧬',
-    color: '#14C38E'
-  },
-  {
-    id: 'donor-program',
-    title: 'Egg & Sperm Donor Program',
-    description: 'Access to carefully screened donors. Comprehensive matching process with full medical history and genetic screening.',
-    icon: '🤝',
-    color: '#00FFAB'
-  },
-  {
-    id: 'male-fertility',
-    title: 'Male Fertility Treatment',
-    description: 'Specialized care for male infertility issues. Advanced diagnostics and treatment options for optimal results.',
-    icon: '👨‍⚕️',
-    color: '#14C38E'
-  },
-  {
-    id: 'surrogacy',
-    title: 'Surrogacy Services',
-    description: 'Comprehensive surrogacy program with legal support. Matching with qualified surrogates and full-cycle management.',
-    icon: '🤱',
-    color: '#00FFAB'
-  },
-  {
-    id: 'fertility-surgery',
-    title: 'Fertility Surgery',
-    description: 'Minimally invasive surgical procedures to address structural issues affecting fertility. Expert surgical team.',
-    icon: '⚕️',
-    color: '#14C38E'
-  }
-];
-
 // Available time slots
 const timeSlots = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -79,9 +12,10 @@ const timeSlots = [
   '16:00', '16:30', '17:00', '17:30'
 ];
 
-// Helper function moved outside component to be stable
+// Helper function for fallback specialty mapping
 const getSpecialtyFromServices = (services) => {
   if (!services || services.length === 0) return 'General Practitioner';
+  // Fallback map for legacy/static IDs if needed
   const specialtyMap = {
     'ivf': 'IVF Specialist',
     'iui': 'Infertility Specialist',
@@ -93,7 +27,7 @@ const getSpecialtyFromServices = (services) => {
     'surrogacy': 'Reproductive Endocrinologist',
     'fertility-surgery': 'Fertility Surgeon'
   };
-  return specialtyMap[services[0]] || 'Fertility Specialist';
+  return specialtyMap[services[0]] || 'Specialist';
 };
 
 const Services = () => {
@@ -104,8 +38,9 @@ const Services = () => {
   const { services: servicesFromRedux, loading: loadingServices } = useCachedServices();
   const { doctors: allDoctorsData } = useCachedDoctors();
   
-  // Use Redux data, fallback to static data if empty
-  const services = servicesFromRedux.length > 0 ? servicesFromRedux : servicesData;
+  // DIRECTLY USE REDUX DATA (Dynamic)
+  // Ensure we default to an empty array if undefined
+  const services = servicesFromRedux || [];
   
   // Booking form state
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -127,12 +62,13 @@ const Services = () => {
     dispatch(fetchDoctors());
   }, [dispatch]);
   
-  // FIX: Memoize allDoctors to prevent infinite re-renders
+  // Memoize allDoctors
   const allDoctors = useMemo(() => {
     return allDoctorsData.map((doctor) => ({
       id: doctor._id || doctor.doctorId,
       name: doctor.name,
-      specialty: getSpecialtyFromServices(doctor.services || []),
+      // Prioritize the actual specialty field from DB, fallback to map
+      specialty: doctor.specialty || getSpecialtyFromServices(doctor.services || []),
       services: doctor.services || []
     }));
   }, [allDoctorsData]);
@@ -141,7 +77,7 @@ const Services = () => {
   useEffect(() => {
     if (formData.serviceId && allDoctors.length > 0) {
       const filtered = allDoctors.filter(doc => 
-        doc.services && doc.services.includes(formData.serviceId)
+        doc.services && doc.services.some(s => s === formData.serviceId || s.id === formData.serviceId)
       );
       setAvailableDoctors(filtered);
     } else {
@@ -204,7 +140,7 @@ const Services = () => {
     return () => {
       elements.forEach((el) => observer.unobserve(el));
     };
-  }, []);
+  }, [services]); // Re-run when services change
 
   // Update available times when doctor or date changes
   useEffect(() => {
@@ -217,7 +153,7 @@ const Services = () => {
 
   // Handle service card click - navigate to doctors page filtered by service
   const handleServiceClick = (serviceId) => {
-    navigate(`/services/${serviceId}/doctors`);
+    navigate(`/doctors?serviceId=${serviceId}`); // Standardize query param
   };
 
   // Handle book new appointment button click
@@ -309,7 +245,7 @@ const Services = () => {
 
     try {
       // Get selected service and doctor details
-      const selectedService = (services.length > 0 ? services : servicesData).find(s => s.id === formData.serviceId);
+      const selectedService = services.find(s => s.id === formData.serviceId || s._id === formData.serviceId);
       const selectedDoctor = allDoctors.find(d => (d.id === formData.doctorId || d._id === formData.doctorId));
 
       if (!selectedDoctor) {
@@ -321,11 +257,11 @@ const Services = () => {
       const appointmentData = {
         doctorId: selectedDoctor.id || selectedDoctor._id,
         doctorName: selectedDoctor.name,
-        serviceId: selectedService.id,
-        serviceName: selectedService.title,
+        serviceId: selectedService.id || selectedService._id,
+        serviceName: selectedService.title || selectedService.name,
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.appointmentTime,
-        amount: 0, // You can set a default amount or calculate based on service
+        amount: selectedService.price || 0, // Use dynamic price from service
         notes: ''
       };
 
@@ -353,8 +289,6 @@ const Services = () => {
           setAvailableDoctors([]);
           setAvailableTimes([]);
           setSuccess('');
-          // Optionally navigate to appointments page
-          // navigate('/appointment');
         }, 2000);
       }
     } catch (err) {
@@ -387,49 +321,60 @@ const Services = () => {
         <section className="services-header animate-on-scroll slide-up">
           <span className="badge">Our Specialized Services</span>
           <h1>
-            Comprehensive <span className="text-gradient">IVF & Fertility Care</span>
+            Comprehensive <span className="text-gradient">Medical Services</span>
           </h1>
           <p className="header-subtext">
-            World-class fertility treatments with cutting-edge technology and compassionate care. 
+            World-class treatments with cutting-edge technology and compassionate care. 
             Choose a service to view our specialized doctors.
           </p>
         </section>
 
         {/* Services Grid */}
         <section className="services-grid-section">
-          <div className="services-grid">
-            {(loadingServices ? [] : (services.length > 0 ? services : servicesData)).map((service, index) => (
-              <div
-                key={service.id}
-                className={`service-card animate-on-scroll slide-up delay-${(index % 3) * 100}`}
-                onClick={() => handleServiceClick(service.id)}
-              >
-                {/* Card Icon */}
-                <div className="service-icon-wrapper">
-                  <div className="service-icon" style={{ '--icon-color': service.color }}>
-                    {service.icon}
+          {loadingServices ? (
+             <div className="loading-state">Loading services...</div>
+          ) : services.length === 0 ? (
+             <div className="empty-state">No services currently available.</div>
+          ) : (
+            <div className="services-grid">
+              {services.map((service, index) => (
+                <div
+                  key={service.id || service._id}
+                  className={`service-card animate-on-scroll slide-up delay-${(index % 3) * 100}`}
+                  onClick={() => handleServiceClick(service.id || service._id)}
+                >
+                  {/* Card Icon */}
+                  <div className="service-icon-wrapper">
+                    <div className="service-icon" style={{ '--icon-color': service.color || '#14C38E' }}>
+                      {service.icon || '🏥'}
+                    </div>
+                    <div className="icon-glow"></div>
                   </div>
-                  <div className="icon-glow"></div>
-                </div>
 
-                {/* Card Content */}
-                <div className="service-content">
-                  <h3>{service.title}</h3>
-                  <p>{service.description}</p>
-                </div>
+                  {/* Card Content */}
+                  <div className="service-content">
+                    <h3>{service.title || service.name}</h3>
+                    <p>{service.description}</p>
+                    {service.price > 0 && (
+                        <p className="service-price" style={{marginTop:'0.5rem', fontWeight:'bold', color: '#14C38E'}}>
+                            Starting at ₹{service.price}
+                        </p>
+                    )}
+                  </div>
 
-                {/* Card Footer */}
-                <div className="service-footer">
-                  <span className="learn-more">
-                    View Specialists <span className="arrow">→</span>
-                  </span>
-                </div>
+                  {/* Card Footer */}
+                  <div className="service-footer">
+                    <span className="learn-more">
+                      View Specialists <span className="arrow">→</span>
+                    </span>
+                  </div>
 
-                {/* Hover Effect Overlay */}
-                <div className="card-overlay"></div>
-              </div>
-            ))}
-          </div>
+                  {/* Hover Effect Overlay */}
+                  <div className="card-overlay"></div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* CTA Section */}
@@ -479,9 +424,9 @@ const Services = () => {
                   className="form-select"
                 >
                   <option value="">Select a service</option>
-                  {(services.length > 0 ? services : servicesData).map(service => (
-                    <option key={service.id} value={service.id}>
-                      {service.title}
+                  {services.map(service => (
+                    <option key={service.id || service._id} value={service.id || service._id}>
+                      {service.title || service.name}
                     </option>
                   ))}
                 </select>
@@ -507,7 +452,7 @@ const Services = () => {
                       : 'Select a doctor'}
                   </option>
                   {availableDoctors.map(doctor => (
-                    <option key={doctor.id || doctor._id} value={doctor.id || doctor._id}>
+                    <option key={doctor.id} value={doctor.id}>
                       {doctor.name} - {doctor.specialty}
                     </option>
                   ))}

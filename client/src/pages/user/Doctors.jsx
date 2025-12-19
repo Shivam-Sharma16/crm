@@ -1,101 +1,102 @@
-import React, { useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { useAppDispatch, useCachedDoctors } from '../../store/hooks';
-import { fetchDoctors } from '../../store/slices/publicDataSlice';
+import { fetchDoctors, fetchServices } from '../../store/slices/publicDataSlice';
 import './Doctors.css';
 
-// Service name mapping for display
-const serviceNameMap = {
-  'ivf': 'IVF',
-  'iui': 'IUI',
-  'icsi': 'ICSI',
-  'egg-freezing': 'Egg Freezing',
-  'genetic-testing': 'Genetic Testing',
-  'donor-program': 'Donor Program',
-  'male-fertility': 'Male Fertility',
-  'surrogacy': 'Surrogacy',
-  'fertility-surgery': 'Fertility Surgery'
-};
-
 const Doctors = () => {
-  const { serviceId } = useParams();
+  // 1. Support both Path Params (/doctors/:id) and Query Params (/doctors?serviceId=id)
+  const { serviceId: paramServiceId } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryServiceId = searchParams.get('serviceId');
+  
+  // Determine the active Service identifier (Slug, ID, or Title)
+  const serviceId = paramServiceId || queryServiceId;
+
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { doctors: doctorsData, loading, error } = useCachedDoctors(serviceId);
   
-  // Map doctors to expected format
-  const doctors = doctorsData.map((doctor, index) => ({
-    id: doctor._id || doctor.doctorId,
-    // Automatically add 'Dr.' prefix if not present
-    name: doctor.name.toLowerCase().startsWith('dr.') ? doctor.name : `Dr. ${doctor.name}`,
-    specialty: doctor.specialty || getSpecialtyFromServices(doctor.services || []),
-    services: doctor.services || [],
-    experience: doctor.experience || 'Experienced',
-    successRate: doctor.successRate || '90%',
-    patients: doctor.patientsCount || '100+',
-    education: doctor.education || 'MD, Specialist',
-    image: doctor.image || (index % 2 === 0 ? '👩‍⚕️' : '👨‍⚕️')
-  }));
+  // 2. Select Data from Redux
+  // We grab the services list to lookup the proper display title
+  const { services: servicesList } = useSelector((state) => state.publicData);
+  const { doctors: doctorsData, loading, error } = useCachedDoctors(serviceId);
 
-  // Helper function to determine specialty based on services
-  const getSpecialtyFromServices = (services) => {
-    if (!services || services.length === 0) return 'General Practitioner';
-    
-    const specialtyMap = {
-      'ivf': 'IVF Specialist',
-      'iui': 'Infertility Specialist',
-      'icsi': 'Reproductive Specialist',
-      'egg-freezing': 'Fertility Preservation Specialist',
-      'genetic-testing': 'Reproductive Geneticist',
-      'donor-program': 'Reproductive Endocrinologist',
-      'male-fertility': 'Urologist & Andrologist',
-      'surrogacy': 'Reproductive Endocrinologist',
-      'fertility-surgery': 'Fertility Surgeon'
+  // 3. Smart Title Logic
+  // Finds the readable name (e.g., "In Vitro Fertilization") even if URL has an ID (e.g., "64f...")
+  const serviceInfo = useMemo(() => {
+    if (!serviceId) return { title: 'Medical Team', description: 'World-renowned fertility experts committed to your success.' };
+
+    // Find matching service in our loaded list
+    const foundService = servicesList.find(s => 
+      s.id === serviceId || 
+      s._id === serviceId || 
+      (s.title && s.title.toLowerCase() === serviceId.replace(/-/g, ' ').toLowerCase())
+    );
+
+    if (foundService) {
+      return { 
+        title: foundService.title,
+        description: foundService.description || `Highly qualified specialists dedicated to ${foundService.title} treatments.`
+      };
+    }
+
+    // Fallback: Format the ID string (e.g., "male-fertility" -> "Male Fertility")
+    // If it looks like a MongoDB ID (24 hex chars), just say "Specialists"
+    const isMongoId = /^[0-9a-fA-F]{24}$/.test(serviceId);
+    const formattedTitle = isMongoId 
+      ? 'Specialist' 
+      : serviceId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    return { 
+      title: formattedTitle,
+      description: `Highly qualified specialists dedicated to your health and well-being.`
     };
-    
-    // Return specialty based on first service
-    return specialtyMap[services[0]] || 'Fertility Specialist';
-  };
+  }, [serviceId, servicesList]);
 
-  // Fetch doctors from backend using Redux
+  // 4. Map doctors to display format
+  const doctors = useMemo(() => {
+    return doctorsData.map((doctor, index) => ({
+      id: doctor._id || doctor.doctorId,
+      name: doctor.name.toLowerCase().startsWith('dr.') ? doctor.name : `Dr. ${doctor.name}`,
+      specialty: doctor.specialty || 'Fertility Specialist', // Backend now handles smart filtering, so we trust this
+      services: doctor.services || [],
+      experience: doctor.experience || 'Experienced',
+      patients: doctor.patientsCount || '100+',
+      education: doctor.education || 'MD, Specialist',
+      image: doctor.image || (index % 2 === 0 ? '👩‍⚕️' : '👨‍⚕️')
+    }));
+  }, [doctorsData]);
+
+  // Effects
   useEffect(() => {
+    // Ensure services are loaded so we can lookup titles
+    if (servicesList.length === 0) {
+      dispatch(fetchServices());
+    }
+    // Fetch doctors based on the ID
     dispatch(fetchDoctors(serviceId || null));
-  }, [serviceId, dispatch]);
+  }, [serviceId, dispatch, servicesList.length]);
 
-  // Get service display name
-  const serviceTitle = serviceId 
-    ? serviceNameMap[serviceId] || serviceId.replace(/-/g, ' ').toUpperCase()
-    : 'All Specialists';
-
-  // Scroll animation logic
+  // Scroll Animation
   useEffect(() => {
     window.scrollTo(0, 0);
-    
-    const observerOptions = {
-      root: null,
-      rootMargin: '0px',
-      threshold: 0.1
-    };
-
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
+        if (entry.isIntersecting) entry.target.classList.add('visible');
       });
-    }, observerOptions);
+    }, { threshold: 0.1 });
 
     const elements = document.querySelectorAll('.animate-on-scroll');
     elements.forEach((el) => observer.observe(el));
+    return () => elements.forEach((el) => observer.unobserve(el));
+  }, [doctors.length, serviceId]);
 
-    return () => {
-      elements.forEach((el) => observer.unobserve(el));
-    };
-  }, [serviceId, doctors]);
-
-  // Handle appointment booking
+  // Handlers
   const handleBookAppointment = (doctorId) => {
-    navigate(`/appointment?doctorId=${doctorId}`);
+    // Pass the service ID along to pre-fill the appointment form if possible
+    const serviceParam = serviceId ? `&serviceId=${serviceId}` : '';
+    navigate(`/appointment?doctorId=${doctorId}${serviceParam}`);
   };
 
   return (
@@ -113,7 +114,7 @@ const Doctors = () => {
             <h1>
               {serviceId ? (
                 <>
-                  <span className="text-gradient">{serviceTitle}</span> Specialists
+                  <span className="text-gradient">{serviceInfo.title}</span> Specialists
                 </>
               ) : (
                 <>
@@ -122,10 +123,7 @@ const Doctors = () => {
               )}
             </h1>
             <p className="header-subtext">
-              {serviceId 
-                ? `Highly qualified specialists dedicated to ${serviceTitle} treatments.`
-                : 'World-renowned fertility experts committed to your success.'
-              }
+              {serviceInfo.description}
             </p>
           </div>
         </section>
@@ -133,9 +131,12 @@ const Doctors = () => {
         {/* Doctors Grid */}
         <section className="doctors-grid-section">
           {loading ? (
-            <div className="loading-message">Loading doctors...</div>
+            <div className="loading-message">
+              <div className="loading-spinner"></div>
+              <p>Finding the best specialists for you...</p>
+            </div>
           ) : error ? (
-            <div className="error-message">{error}</div>
+            <div className="error-message">Unable to load doctors. Please try again later.</div>
           ) : doctors.length > 0 ? (
             <div className="doctors-grid">
               {doctors.map((doctor, index) => (
@@ -146,17 +147,13 @@ const Doctors = () => {
                   {/* Doctor Image */}
                   <div className="doctor-image-wrapper">
                     <div className="doctor-image">
-                      <span className="doctor-emoji">{doctor.image}</span>
+                      {doctor.image && doctor.image.startsWith('http') ? (
+                         <img src={doctor.image} alt={doctor.name} />
+                      ) : (
+                         <span className="doctor-emoji">{doctor.image}</span>
+                      )}
                     </div>
                     <div className="image-overlay"></div>
-                    
-                    {/* REMOVED: Success Rate Badge 
-                       <div className="success-badge">
-                         <span className="success-rate">{doctor.successRate}</span>
-                         <span className="success-label">Success Rate</span>
-                       </div>
-                    */}
-
                   </div>
 
                   {/* Doctor Info */}
@@ -179,16 +176,19 @@ const Doctors = () => {
                       </div>
                     </div>
 
-                    {/* Services Tags */}
+                    {/* Services Tags (Visual only) */}
                     <div className="services-tags">
-                      {doctor.services.slice(0, 2).map((service) => (
-                        <span key={service} className="service-tag">
-                          {serviceNameMap[service] || service}
-                        </span>
-                      ))}
-                      {doctor.services.length > 2 && (
-                        <span className="service-tag more">+{doctor.services.length - 2}</span>
-                      )}
+                       {/* We prioritize the current service tag if it exists */}
+                       {serviceId && <span className="service-tag active">{serviceInfo.title}</span>}
+                       {doctor.services
+                         .filter(s => s !== serviceId && s !== serviceInfo.title) // valid attempt to filter duplicates
+                         .slice(0, 2)
+                         .map((s, i) => (
+                           <span key={i} className="service-tag">
+                             {/* Try to make slug readable if it's a slug */}
+                             {s.length < 20 ? s.replace(/-/g, ' ') : 'Specialized Care'}
+                           </span>
+                       ))}
                     </div>
 
                     {/* Action Button */}
@@ -210,13 +210,16 @@ const Doctors = () => {
               <div className="empty-state">
                 <div className="empty-icon">👨‍⚕️</div>
                 <h3>No Specialists Found</h3>
-                <p>We don't have specialists specifically for this service category yet, but our general team is ready to help.</p>
+                <p>
+                  We couldn't find a doctor specifically matching <strong>"{serviceInfo.title}"</strong> at the moment.
+                </p>
+                <p>However, our general fertility experts are available to assist you.</p>
                 <div className="empty-actions">
-                  <Link to="/services" className="btn btn-secondary">
-                    Browse All Services
-                  </Link>
-                  <button className="btn btn-primary">
-                    Contact Support
+                  <button onClick={() => navigate('/doctors')} className="btn btn-secondary">
+                    View All Doctors
+                  </button>
+                  <button onClick={() => navigate('/appointment')} className="btn btn-primary">
+                    Book General Consultation
                   </button>
                 </div>
               </div>
@@ -230,7 +233,9 @@ const Doctors = () => {
             <div className="cta-card">
               <h2>Need Help Choosing a Doctor?</h2>
               <p>Our patient coordinators can help you find the perfect specialist for your needs.</p>
-              <button className="btn btn-white">Get Personalized Recommendation</button>
+              <button className="btn btn-white" onClick={() => navigate('/appointment')}>
+                Get Personalized Recommendation
+              </button>
             </div>
           </section>
         )}

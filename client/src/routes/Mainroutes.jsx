@@ -16,6 +16,7 @@ import Pharmacy from '../pages/user/Pharmacy';
 import Login from '../pages/user/Login';
 import Signup from '../pages/user/Signup';
 
+
 // Doctor Pages
 import Patient from '../pages/doctors/Patient';
 import DoctorPatientDetails from '../pages/doctors/DoctorPatientDetails';
@@ -31,6 +32,7 @@ import AdminServices from '../pages/admin/AdminServices';
 // Admin Auth
 import AdminLogin from '../pages/administration/AdminLogin';
 import AdminSignup from '../pages/administration/AdminSignup';
+import Administrator from '../pages/administration/Administrator';
 
 export const MainRoutes = () => {
   return (
@@ -69,6 +71,12 @@ export const MainRoutes = () => {
         <Route path="/admin/pharmacy" element={<AdminPharmacy />} />
         <Route path="/admin/reception" element={<AdminReception />} />
         <Route path="/admin/services" element={<AdminServices />} />
+
+        {/* administration routes */}
+        
+        <Route path="/administrator/login" element={<AdminLogin />} />
+        <Route path="/administrator/signup" element={<AdminSignup />} />
+        <Route path="/administrator" element={<Administrator />} />
       </Routes>
     </>
   );
