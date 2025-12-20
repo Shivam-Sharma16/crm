@@ -6,8 +6,6 @@ import './Home.css';
 const Home = () => {
   const navigate = useNavigate();
 
-  // Logic to handle scroll animations
-  // NOTE: Lenis is now handled globally in App.jsx
   useEffect(() => {
     const observerOptions = {
       root: null,
@@ -26,11 +24,33 @@ const Home = () => {
     const elements = document.querySelectorAll('.animate-on-scroll');
     elements.forEach((el) => observer.observe(el));
 
-    // Cleanup
     return () => {
       elements.forEach((el) => observer.unobserve(el));
     };
   }, []);
+
+  const doctors = [
+    { 
+      name: "Dr. Elena Gilbert", 
+      role: "Senior Embryologist", 
+      image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400&h=400" 
+    },
+    { 
+      name: "Dr. Stefan Salvatore", 
+      role: "IVF Specialist", 
+      image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400&h=400" 
+    },
+    { 
+      name: "Dr. Caroline Forbes", 
+      role: "Reproductive Surgeon", 
+      image: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&q=80&w=400&h=400" 
+    },
+    { 
+      name: "Dr. Alaric Saltzman", 
+      role: "Andrologist", 
+      image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400&h=400" 
+    }
+  ];
 
   return (
     <div className="home-container">
@@ -77,7 +97,6 @@ const Home = () => {
           </div>
 
           <div className="hero-visual animate-on-scroll fade-in delay-200">
-            {/* Professional IVF Visualization */}
             <div className="visual-card main-card slow-pulse">
               <div className="card-icon">🧬</div>
               <h3>Advanced Embryology</h3>
@@ -102,17 +121,17 @@ const Home = () => {
           </div>
           
           <div className="features-grid">
-            <div className="feature-card color-animate animate-on-scroll slide-up delay-100">
+            <div className="feature-card gradient-hover animate-on-scroll slide-up delay-100">
               <div className="icon-box">🎯</div>
               <h3>High Success Rates</h3>
               <p>Our advanced protocols consistently deliver success rates well above the national average.</p>
             </div>
-            <div className="feature-card color-animate animate-on-scroll slide-up delay-200">
+            <div className="feature-card gradient-hover animate-on-scroll slide-up delay-200">
               <div className="icon-box">🤝</div>
               <h3>Compassionate Care</h3>
               <p>A dedicated team of counselors and specialists to support you emotionally and physically.</p>
             </div>
-            <div className="feature-card color-animate animate-on-scroll slide-up delay-300">
+            <div className="feature-card gradient-hover animate-on-scroll slide-up delay-300">
               <div className="icon-box">💡</div>
               <h3>Latest Technology</h3>
               <p>Equipped with Time-Lapse Imaging and Laser Assisted Hatching for better outcomes.</p>
@@ -138,7 +157,7 @@ const Home = () => {
               { title: 'Male Infertility', desc: 'Comprehensive diagnosis and treatments for male reproductive health.' },
               { title: 'Genetic Testing', desc: 'PGT-A and PGT-M testing to ensure a healthy pregnancy.' }
             ].map((service, index) => (
-              <div key={index} className={`service-card color-animate animate-on-scroll slide-up delay-${(index % 3) * 100}`}>
+              <div key={index} className={`service-card gradient-hover animate-on-scroll slide-up delay-${(index % 3) * 100}`}>
                 <div className="service-icon-wrapper">
                   <div className="dot-pulse"></div>
                 </div>
@@ -160,14 +179,15 @@ const Home = () => {
           </div>
 
           <div className="doctors-grid">
-            {[
-              { name: "Dr. Elena Gilbert", role: "Senior Embryologist" },
-              { name: "Dr. Stefan Salvatore", role: "IVF Specialist" },
-              { name: "Dr. Caroline Forbes", role: "Reproductive Surgeon" },
-              { name: "Dr. Alaric Saltzman", role: "Andrologist" }
-            ].map((doc, idx) => (
+            {doctors.map((doc, idx) => (
               <div key={idx} className="doctor-card animate-on-scroll fade-in">
-                <div className="doctor-img-placeholder"></div>
+                <div className="doctor-img-wrapper">
+                  <img src={doc.image} alt={doc.name} className="doctor-img" />
+                  <div className="doctor-overlay">
+                    <button className="btn-icon">📅</button>
+                    <button className="btn-icon">✉️</button>
+                  </div>
+                </div>
                 <div className="doctor-info">
                   <h3>{doc.name}</h3>
                   <span className="specialty">{doc.role}</span>

@@ -18,24 +18,22 @@
   --radius-xl: 24px;
 }
 
-/* --- ANIMATIONS: COLOR PULSE --- */
+/* --- ANIMATIONS --- */
 @keyframes borderPulse {
   0% { border-color: transparent; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
   50% { border-color: var(--primary-teal); box-shadow: 0 10px 25px -5px rgba(20, 195, 142, 0.2); }
   100% { border-color: transparent; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
 }
 
-@keyframes slowGlow {
+@keyframes gradientShift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
 
-.color-animate {
-  border: 1px solid transparent; 
-  /* The animation will be triggered by default or on hover depending on preference. 
-     Here it runs continuously for a "breathing" effect */
-  animation: borderPulse 4s infinite ease-in-out;
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
 }
 
 /* --- BASE STYLES --- */
@@ -124,7 +122,7 @@ body {
 /* --- HERO SECTION --- */
 .hero-section {
   position: relative;
-  min-height: 90vh; /* Professional look usually uses slightly less than 100vh */
+  min-height: 90vh;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -267,11 +265,6 @@ body {
   animation: float 8s ease-in-out infinite 0.5s;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
-}
-
 /* --- FEATURES & SERVICES --- */
 .section-header {
   text-align: center;
@@ -290,25 +283,33 @@ body {
   gap: 30px;
 }
 
+/* UPDATED CARD STYLES */
 .feature-card, .service-card {
   background: var(--white);
   padding: 35px 30px;
   border-radius: var(--radius-lg);
-  transition: all 0.3s ease;
+  transition: all 0.4s ease;
   text-align: left;
   position: relative;
   overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.03);
+  /* The gradient hover setup */
+  background: linear-gradient(135deg, #ffffff 0%, #f8fcfc 50%, #e0f2f1 100%);
+  background-size: 200% 200%;
+  background-position: 0% 0%;
 }
 
-.feature-card:hover, .service-card:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--shadow-lg);
+.gradient-hover:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 15px 30px rgba(20, 195, 142, 0.15);
+  background-position: 100% 100%;
+  border-color: rgba(20, 195, 142, 0.3);
 }
 
 .icon-box {
   width: 60px;
   height: 60px;
-  background: var(--bg-light);
+  background: linear-gradient(135deg, #e0f7fa, #e0f2f1);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -316,6 +317,12 @@ body {
   font-size: 1.8rem;
   margin-bottom: 20px;
   color: var(--primary-teal);
+  transition: transform 0.3s ease;
+}
+
+.feature-card:hover .icon-box, 
+.service-card:hover .icon-box {
+  transform: scale(1.1) rotate(5deg);
 }
 
 .service-icon-wrapper {
@@ -340,12 +347,14 @@ body {
   margin-bottom: 10px;
   font-size: 1.25rem;
   color: var(--primary-blue);
+  font-weight: 700;
 }
 
 .feature-card p, .service-card p {
   color: var(--text-gray);
   font-size: 0.95rem;
   margin-bottom: 20px;
+  line-height: 1.7;
 }
 
 .learn-more {
@@ -353,12 +362,16 @@ body {
   font-weight: 600;
   cursor: pointer;
   font-size: 0.9rem;
+  transition: margin-left 0.2s;
+}
+.service-card:hover .learn-more {
+  margin-left: 5px;
 }
 
 /* --- DOCTORS --- */
 .doctors-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 30px;
 }
 
@@ -367,18 +380,103 @@ body {
   overflow: hidden;
   background: var(--white);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.3s ease;
+  transition: all 0.4s ease;
   text-align: center;
+  position: relative;
+  border: 1px solid rgba(0,0,0,0.05);
 }
-.doctor-card:hover { transform: translateY(-8px); }
 
-.doctor-img-placeholder {
-  height: 250px;
-  background: linear-gradient(to top, #cfd9df 0%, #e2ebf0 100%);
+.doctor-card:hover { 
+  transform: translateY(-10px); 
+  box-shadow: var(--shadow-lg);
 }
-.doctor-info { padding: 20px; }
-.doctor-info h3 { color: var(--primary-blue); margin-bottom: 4px; }
-.specialty { color: var(--primary-teal); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
+
+.doctor-img-wrapper {
+  position: relative;
+  height: 320px;
+  overflow: hidden;
+  background-color: #f0f2f5;
+}
+
+.doctor-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.doctor-card:hover .doctor-img {
+  transform: scale(1.05);
+}
+
+/* Overlay on hover */
+.doctor-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 38, 71, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.doctor-card:hover .doctor-overlay {
+  opacity: 1;
+}
+
+.btn-icon {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: var(--white);
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+}
+
+.doctor-card:hover .btn-icon {
+  transform: translateY(0);
+}
+.btn-icon:hover {
+  background: var(--primary-teal);
+  color: white;
+}
+
+.doctor-info { 
+  padding: 24px; 
+  background: linear-gradient(180deg, var(--white) 0%, #fafbfc 100%);
+  position: relative;
+  z-index: 2;
+}
+
+.doctor-info h3 { 
+  color: var(--primary-blue); 
+  margin-bottom: 6px; 
+  font-size: 1.2rem;
+}
+
+.specialty { 
+  color: var(--primary-teal); 
+  font-size: 0.85rem; 
+  font-weight: 700; 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px; 
+  display: block;
+  margin-bottom: 12px;
+}
+
+.social-dots {
+  color: var(--text-gray);
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
 
 /* --- TESTIMONIALS --- */
 .testimonials-section {
@@ -404,9 +502,14 @@ body {
   max-width: 500px;
   text-align: left;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.3s ease;
+}
+.testimonial-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-5px);
 }
 .quote-icon { font-size: 4rem; line-height: 0.5; margin-bottom: 20px; color: var(--primary-teal); }
-.testimonial-card h4 { color: var(--accent-aqua); }
+.testimonial-card h4 { color: var(--accent-aqua); margin-top: 15px; }
 
 /* --- CTA --- */
 .cta-section {
@@ -423,6 +526,8 @@ body {
   text-align: center;
   color: var(--white);
   box-shadow: 0 20px 40px rgba(10, 38, 71, 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
 /* --- RESPONSIVE --- */
@@ -437,4 +542,5 @@ body {
   .features-grid, .services-grid { grid-template-columns: 1fr; }
   .hero-text h1 { font-size: 2.5rem; }
   .section { padding: 60px 0; }
+  .main-card { width: 100%; max-width: 300px; }
 }
