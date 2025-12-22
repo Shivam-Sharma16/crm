@@ -15,6 +15,7 @@ const timeSlots = [
 // Helper function for fallback specialty mapping
 const getSpecialtyFromServices = (services) => {
   if (!services || services.length === 0) return 'General Practitioner';
+  
   // Fallback map for legacy/static IDs if needed
   const specialtyMap = {
     'ivf': 'IVF Specialist',
@@ -27,7 +28,9 @@ const getSpecialtyFromServices = (services) => {
     'surrogacy': 'Reproductive Endocrinologist',
     'fertility-surgery': 'Fertility Surgeon'
   };
-  return specialtyMap[services[0]] || 'Specialist';
+  
+  // Return mapped specialty or capitalize the first service
+  return specialtyMap[services[0]] || (typeof services[0] === 'string' ? services[0] : 'Specialist');
 };
 
 const Services = () => {
@@ -38,7 +41,6 @@ const Services = () => {
   const { services: servicesFromRedux, loading: loadingServices } = useCachedServices();
   const { doctors: allDoctorsData } = useCachedDoctors();
   
-  // DIRECTLY USE REDUX DATA (Dynamic)
   // Ensure we default to an empty array if undefined
   const services = servicesFromRedux || [];
   
@@ -69,21 +71,56 @@ const Services = () => {
       name: doctor.name,
       // Prioritize the actual specialty field from DB, fallback to map
       specialty: doctor.specialty || getSpecialtyFromServices(doctor.services || []),
-      services: doctor.services || []
+      services: doctor.services || [],
+      // Keep original object for reference
+      original: doctor
     }));
   }, [allDoctorsData]);
   
-  // Filter doctors when service changes
+  // --- FIXED: Dynamic Doctor Filtering Logic ---
   useEffect(() => {
     if (formData.serviceId && allDoctors.length > 0) {
-      const filtered = allDoctors.filter(doc => 
-        doc.services && doc.services.some(s => s === formData.serviceId || s.id === formData.serviceId)
+      // 1. Find the selected service object to get all its possible identifiers
+      const selectedService = services.find(s => 
+        (s.id && s.id.toString() === formData.serviceId) || 
+        (s._id && s._id.toString() === formData.serviceId)
       );
+
+      // 2. Build a list of valid matchers (ID, Title, Name) for this service
+      // This ensures we match regardless of how the doctor stored the service reference
+      let matchers = [formData.serviceId];
+      if (selectedService) {
+        matchers = [
+          ...matchers,
+          selectedService.id,    // Custom string ID (e.g. 'ivf')
+          selectedService._id,   // MongoDB ObjectId
+          selectedService.title, // Title (e.g. 'IVF Treatment')
+          selectedService.name   // Fallback name
+        ].filter(Boolean);       // Remove null/undefined
+      }
+      
+      // Normalize matchers for case-insensitive comparison
+      const normalizedMatchers = matchers.map(m => m.toString().toLowerCase());
+
+      // 3. Filter doctors who have ANY of these service identifiers
+      const filtered = allDoctors.filter(doc => {
+        if (!doc.services || !Array.isArray(doc.services)) return false;
+
+        return doc.services.some(docService => {
+          // Handle cases where doctor service might be an object or a string
+          const serviceVal = (typeof docService === 'object') 
+            ? (docService.id || docService._id || docService.name) 
+            : docService;
+            
+          return serviceVal && normalizedMatchers.includes(serviceVal.toString().toLowerCase());
+        });
+      });
+
       setAvailableDoctors(filtered);
     } else {
       setAvailableDoctors([]);
     }
-  }, [formData.serviceId, allDoctors]);
+  }, [formData.serviceId, allDoctors, services]);
 
   // Update available time slots based on date
   const updateAvailableTimes = useCallback((selectedDate) => {
@@ -140,7 +177,7 @@ const Services = () => {
     return () => {
       elements.forEach((el) => observer.unobserve(el));
     };
-  }, [services]); // Re-run when services change
+  }, [services]);
 
   // Update available times when doctor or date changes
   useEffect(() => {
@@ -153,7 +190,7 @@ const Services = () => {
 
   // Handle service card click - navigate to doctors page filtered by service
   const handleServiceClick = (serviceId) => {
-    navigate(`/doctors?serviceId=${serviceId}`); // Standardize query param
+    navigate(`/doctors?serviceId=${serviceId}`);
   };
 
   // Handle book new appointment button click
@@ -245,8 +282,12 @@ const Services = () => {
 
     try {
       // Get selected service and doctor details
-      const selectedService = services.find(s => s.id === formData.serviceId || s._id === formData.serviceId);
-      const selectedDoctor = allDoctors.find(d => (d.id === formData.doctorId || d._id === formData.doctorId));
+      const selectedService = services.find(s => 
+        (s.id && s.id.toString() === formData.serviceId) || 
+        (s._id && s._id.toString() === formData.serviceId)
+      );
+      
+      const selectedDoctor = allDoctors.find(d => d.id === formData.doctorId);
 
       if (!selectedDoctor) {
         setError('Selected doctor not found');
@@ -255,13 +296,14 @@ const Services = () => {
       }
 
       const appointmentData = {
-        doctorId: selectedDoctor.id || selectedDoctor._id,
+        doctorId: selectedDoctor.id,
         doctorName: selectedDoctor.name,
-        serviceId: selectedService.id || selectedService._id,
-        serviceName: selectedService.title || selectedService.name,
+        // Use the ID the backend expects (prefer object ID, fallback to string ID)
+        serviceId: selectedService ? (selectedService.id || selectedService._id) : formData.serviceId,
+        serviceName: selectedService ? (selectedService.title || selectedService.name) : 'Service',
         appointmentDate: formData.appointmentDate,
         appointmentTime: formData.appointmentTime,
-        amount: selectedService.price || 0, // Use dynamic price from service
+        amount: selectedService ? (selectedService.price || 0) : 0, 
         notes: ''
       };
 
@@ -292,6 +334,7 @@ const Services = () => {
         }, 2000);
       }
     } catch (err) {
+      console.error(err);
       setError(err.response?.data?.message || 'Failed to book appointment. Please try again.');
     } finally {
       setIsSubmitting(false);

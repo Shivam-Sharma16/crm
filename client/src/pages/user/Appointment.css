@@ -150,6 +150,11 @@
   color: #888;
 }
 
+.booking-form .form-select option {
+  background-color: #1a1f3a;
+  color: #ffffff;
+}
+
 .booking-form .form-hint {
   display: block;
   margin-top: 6px;
@@ -247,6 +252,10 @@
 
 .btn-icon {
   font-size: 1.2rem;
+  background: white;
+  margin-bottom: 1rem;
+ padding-top:6px ;
+      transform: translateY(10px);
 }
 
 .back-link {
@@ -367,7 +376,7 @@
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 12px;
-  color: #ffffff;
+  color: white;
 }
 
 .label-icon {
@@ -596,7 +605,6 @@
   padding: 40px;
   margin-bottom: 40px;
   backdrop-filter: blur(10px);
-  c
 }
 
 .booking-form-header {
