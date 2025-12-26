@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Appointment = require('../models/appointment.model');
-const User = require('../models/user.model');
 const Doctor = require('../models/doctor.model');
 const { verifyToken } = require('../middleware/auth.middleware');
 
@@ -9,32 +8,26 @@ const { verifyToken } = require('../middleware/auth.middleware');
 router.post('/create', verifyToken, async (req, res) => {
   try {
     const { doctorId, serviceId, serviceName, appointmentDate, appointmentTime, amount, notes } = req.body;
-    const userId = req.user.userId; // From the verified token
-
-    console.log("--- New Appointment Request ---");
-    console.log("Request Body:", req.body);
+    const userId = req.user.userId;
 
     if (!doctorId || !appointmentDate || !appointmentTime) {
       return res.status(400).json({ success: false, message: 'Missing required fields (doctorId, date, or time)' });
     }
 
-    // --- 1. FIND DOCTOR (Smart Lookup) ---
-    // We try to find the doctor profile using the ID provided.
-    // It could be the Doctor Object ID directly, OR the User ID associated with the doctor.
+    // 1. Find Doctor
     let doctorDoc = await Doctor.findOne({
       $or: [
-        { _id: (doctorId.match(/^[0-9a-fA-F]{24}$/) ? doctorId : null) }, // Check if valid ObjectId
+        { _id: (doctorId.match(/^[0-9a-fA-F]{24}$/) ? doctorId : null) },
         { userId: (doctorId.match(/^[0-9a-fA-F]{24}$/) ? doctorId : null) },
-        { doctorId: doctorId } // Custom String ID
+        { doctorId: doctorId }
       ]
     });
 
     if (!doctorDoc) {
-      console.log("Doctor not found for ID:", doctorId);
       return res.status(400).json({ success: false, message: 'Doctor not found.' });
     }
 
-    // --- 2. VALIDATE DATE ---
+    // 2. Validate Date
     const today = new Date();
     const reqDate = new Date(appointmentDate);
     const todayStr = today.toISOString().split('T')[0];
@@ -44,7 +37,7 @@ router.post('/create', verifyToken, async (req, res) => {
         return res.status(400).json({ success: false, message: 'Cannot book appointments in the past.' });
     }
 
-    // --- 3. VALIDATE TIME ---
+    // 3. Validate Time
     if (reqDateStr === todayStr) {
         const currentHours = today.getHours();
         const currentMinutes = today.getMinutes();
@@ -52,13 +45,12 @@ router.post('/create', verifyToken, async (req, res) => {
         const [reqHours, reqMinutes] = appointmentTime.split(':').map(Number);
         const reqTimeInMin = reqHours * 60 + reqMinutes;
 
-        if (reqTimeInMin <= currentTimeInMin + 15) { // 15 min buffer
+        if (reqTimeInMin <= currentTimeInMin + 15) {
              return res.status(400).json({ success: false, message: 'This time slot is too soon or has passed.' });
         }
     }
 
-    // --- 4. CHECK AVAILABILITY ---
-    // If doctor has specific hours, check them. Otherwise default to allow.
+    // 4. Check Availability
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayName = days[reqDate.getDay()];
     
@@ -67,7 +59,6 @@ router.post('/create', verifyToken, async (req, res) => {
         if (!daySchedule.available) {
             return res.status(400).json({ success: false, message: `Doctor is not available on ${dayName}s.` });
         }
-        // If start/end time exists, validate range
         if (daySchedule.startTime && daySchedule.endTime) {
             const getMin = (t) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]);
             const reqMin = getMin(appointmentTime);
@@ -80,9 +71,9 @@ router.post('/create', verifyToken, async (req, res) => {
         }
     }
 
-    // --- 5. CHECK FOR DOUBLE BOOKING ---
+    // 5. Check for Double Booking
     const existingAppointment = await Appointment.findOne({
-        doctorId: doctorDoc._id, // Strict check on Doctor Object ID
+        doctorId: doctorDoc._id,
         appointmentDate: new Date(reqDateStr),
         appointmentTime: appointmentTime,
         status: { $ne: 'cancelled' }
@@ -92,11 +83,11 @@ router.post('/create', verifyToken, async (req, res) => {
         return res.status(400).json({ success: false, message: 'This slot is already booked.' });
     }
 
-    // --- 6. SAVE APPOINTMENT ---
+    // 6. Save Appointment
     const appointment = new Appointment({
       userId: userId,
-      doctorId: doctorDoc._id,      // ALWAYS save the Doctor Object ID
-      doctorUserId: doctorDoc.userId, // Save User ID reference if needed
+      doctorId: doctorDoc._id,
+      doctorUserId: doctorDoc.userId,
       doctorName: doctorDoc.name,
       serviceId: serviceId || (doctorDoc.services && doctorDoc.services[0]) || 'general',
       serviceName: serviceName || 'General Consultation',
@@ -109,7 +100,6 @@ router.post('/create', verifyToken, async (req, res) => {
     });
 
     await appointment.save();
-    console.log(`Appointment created: ${appointment._id} for Doctor: ${doctorDoc.name}`);
     res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment });
 
   } catch (error) {
@@ -118,7 +108,7 @@ router.post('/create', verifyToken, async (req, res) => {
   }
 });
 
-// Get My Appointments
+// Get My Appointments (Will include labTests, diet, pharmacy)
 router.get('/my-appointments', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;

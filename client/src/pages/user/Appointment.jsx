@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useAppDispatch, useAuth, useAppointments, useCachedServices, useCachedDoctors } from '../../store/hooks';
 import { fetchAppointments, createAppointment } from '../../store/slices/appointmentSlice';
 import { fetchServices, fetchDoctors, fetchBookedSlots } from '../../store/slices/publicDataSlice';
-import { useSelector } from 'react-redux'; // Add selector
+import { useSelector } from 'react-redux';
 import './Appointment.css';
 
 // Base available time slots
@@ -44,6 +44,11 @@ const Appointment = () => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [availableTimes, setAvailableTimes] = useState([]);
+
+  // --- NEW: Details Modal State ---
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  // --------------------------------
   
   // React Hook Form
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm({
@@ -65,6 +70,7 @@ const Appointment = () => {
     dispatch(fetchDoctors());
   }, [dispatch]);
 
+  // --- AUTHENTICATION CHECK PRESERVED ---
   useEffect(() => {
     if (!isAuthenticated || !user) {
       navigate('/login?redirect=/appointment' + (doctorId ? `?doctorId=${doctorId}` : ''));
@@ -85,7 +91,7 @@ const Appointment = () => {
     }
   }, [doctorId, navigate, doctorsData, isAuthenticated, user, dispatch]);
 
-  // NEW: Fetch booked slots when doctor or date changes
+  // Fetch booked slots when doctor or date changes
   useEffect(() => {
     const currentDoctorId = watchedDoctorId || (selectedDoctor ? (selectedDoctor._id || selectedDoctor.doctorId) : null);
     const currentDate = watchedDate || formData.appointmentDate;
@@ -103,12 +109,12 @@ const Appointment = () => {
 
     let times = [...timeSlots];
 
-    // 0. Filter by Booked Slots (NEW)
+    // Filter by Booked Slots
     if (bookedSlots && bookedSlots.length > 0) {
       times = times.filter(t => !bookedSlots.includes(t));
     }
 
-    // 1. Filter by Doctor's Schedule
+    // Filter by Doctor's Schedule
     const currentDoctorId = watchedDoctorId || (selectedDoctor ? (selectedDoctor._id || selectedDoctor.doctorId) : null);
     
     if (currentDoctorId && doctorsData.length > 0) {
@@ -142,7 +148,7 @@ const Appointment = () => {
         }
     }
 
-    // 2. Filter by Current Time (if Today)
+    // Filter by Current Time (if Today)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const selectedDateObj = new Date(selectedDate);
@@ -162,7 +168,7 @@ const Appointment = () => {
     }
 
     setAvailableTimes(times);
-  }, [watchedDoctorId, doctorsData, selectedDoctor, bookedSlots]); // Add bookedSlots dependency
+  }, [watchedDoctorId, doctorsData, selectedDoctor, bookedSlots]);
 
   useEffect(() => {
     if (watchedServiceId && doctorsData.length > 0) {
@@ -181,23 +187,17 @@ const Appointment = () => {
   useEffect(() => {
     if (watchedDate) {
       updateAvailableTimes(watchedDate);
-      // Only clear time if the currently selected time is now invalid
-      // But for simplicity, we clear it to force re-selection
-      // Check if watchedTime is still in availableTimes (requires a sync update, so clearing is safer)
-      // setValue('appointmentTime', ''); 
     } else {
       setAvailableTimes([]);
       setValue('appointmentTime', '');
     }
   }, [watchedDoctorId, watchedDate, updateAvailableTimes, setValue]);
   
-  // Also update times when looking at a specific doctor page and changing date
   useEffect(() => {
       if (selectedDoctor && formData.appointmentDate) {
           updateAvailableTimes(formData.appointmentDate);
       }
-  }, [selectedDoctor, formData.appointmentDate, updateAvailableTimes, bookedSlots]); // Add bookedSlots
-
+  }, [selectedDoctor, formData.appointmentDate, updateAvailableTimes, bookedSlots]);
 
   const getMaxDate = () => {
     const maxDate = new Date();
@@ -290,7 +290,6 @@ const Appointment = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
-    // If date changes, fetch slots again (handled by useEffect)
   };
 
   const handleBookingFormSubmit = async (e) => {
@@ -357,6 +356,12 @@ const Appointment = () => {
     });
   };
 
+  // --- NEW: Helper to Open Details Modal ---
+  const handleViewDetails = (apt) => {
+    setSelectedAppointment(apt);
+    setShowDetailsModal(true);
+  };
+
   const isUpcoming = (appointmentDate, appointmentTime) => {
     const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
     return appointmentDateTime >= new Date();
@@ -365,7 +370,12 @@ const Appointment = () => {
   if (!isAuthenticated) {
     return (
       <div className="appointment-page">
-        <div className="content-wrapper"><div className="loading-state"><p>Loading...</p></div></div>
+        <div className="content-wrapper">
+            {/* Added style to ensure loading is visible */}
+            <div className="loading-state" style={{padding: '50px', textAlign: 'center', color: '#333'}}>
+                <p>Loading your appointments...</p>
+            </div>
+        </div>
       </div>
     );
   }
@@ -504,19 +514,17 @@ const Appointment = () => {
                           </div>
                         </div>
 
-                        {appointment.prescription && (
-                            <div className="appointment-prescription" style={{marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '1rem'}}>
-                                <a 
-                                    href={appointment.prescription} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="btn btn-secondary" 
-                                    style={{width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none'}}
-                                >
-                                    📄 View Prescription
-                                </a>
-                            </div>
-                        )}
+                        {/* --- MODIFIED: View Details Button --- */}
+                        <div style={{marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '1rem'}}>
+                            <button 
+                                onClick={() => handleViewDetails(appointment)}
+                                className="btn btn-secondary" 
+                                style={{width: '100%', textAlign: 'center', display: 'block'}}
+                            >
+                                📄 View Details
+                            </button>
+                        </div>
+
                       </div>
                     </div>
                   );
@@ -568,6 +576,108 @@ const Appointment = () => {
                </div>
              </form>
           </div>
+        </div>
+      )}
+
+      {/* --- NEW: Details Modal --- */}
+      {showDetailsModal && selectedAppointment && (
+        <div className="details-modal-overlay" onClick={() => setShowDetailsModal(false)}>
+            <div className="details-modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="details-header">
+                    <h2>Appointment Details</h2>
+                    <button className="close-details-btn" onClick={() => setShowDetailsModal(false)}>×</button>
+                </div>
+                
+                <div className="details-body">
+                    <div className="details-info-grid">
+                        <div><strong>Doctor:</strong> {selectedAppointment.doctorName}</div>
+                        <div><strong>Date:</strong> {formatDate(selectedAppointment.appointmentDate)}</div>
+                        <div><strong>Time:</strong> {selectedAppointment.appointmentTime}</div>
+                        <div><strong>Status:</strong> <span className={`status-text ${selectedAppointment.status}`}>{selectedAppointment.status}</span></div>
+                    </div>
+
+                    <hr />
+
+                    {/* IVF Labs */}
+                    {selectedAppointment.labTests && selectedAppointment.labTests.length > 0 && (
+                        <div className="detail-section">
+                            <h4>🧬 Lab Tests Prescribed</h4>
+                            <div className="tags-container">
+                                {selectedAppointment.labTests.map((lab, i) => (
+                                    <span key={i} className="detail-tag lab-tag">{lab}</span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* IVF Diet */}
+                    {selectedAppointment.diet && selectedAppointment.diet.length > 0 && (
+                        <div className="detail-section">
+                            <h4>🥗 Dietary Recommendations</h4>
+                            <ul className="detail-list">
+                                {selectedAppointment.diet.map((item, i) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Pharmacy Table */}
+                    {selectedAppointment.pharmacy && selectedAppointment.pharmacy.length > 0 && (
+                        <div className="detail-section">
+                            <h4>💊 Medications</h4>
+                            <table className="med-table">
+                                <thead>
+                                    <tr>
+                                        <th>Medicine</th>
+                                        <th>Frequency</th>
+                                        <th>Duration</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedAppointment.pharmacy.map((med, i) => (
+                                        <tr key={i}>
+                                            <td>{med.name}</td>
+                                            <td>{med.frequency || '-'}</td>
+                                            <td>{med.duration || '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Notes */}
+                    {selectedAppointment.notes && (
+                        <div className="detail-section">
+                            <h4>📝 Doctor's Notes</h4>
+                            <p className="notes-text">{selectedAppointment.notes}</p>
+                        </div>
+                    )}
+
+                    {/* Documents / Files */}
+                    <div className="detail-section">
+                        <h4>📂 Documents & Prescriptions</h4>
+                        {(!selectedAppointment.prescriptions || selectedAppointment.prescriptions.length === 0) && !selectedAppointment.prescription ? (
+                            <p className="no-data">No documents uploaded.</p>
+                        ) : (
+                            <div className="files-list">
+                                {/* Support for both old single file and new multi-file structure */}
+                                {selectedAppointment.prescription && (!selectedAppointment.prescriptions || selectedAppointment.prescriptions.length === 0) && (
+                                    <a href={selectedAppointment.prescription} target="_blank" rel="noopener noreferrer" className="file-link">
+                                        📄 View Prescription
+                                    </a>
+                                )}
+                                {selectedAppointment.prescriptions?.map((file, i) => (
+                                    <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className="file-link">
+                                        📄 {file.name || `Document ${i+1}`}
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
       )}
     </div>

@@ -53,11 +53,24 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // --- NEW FIELDS: IVF TREATMENT DETAILS ---
+  labTests: [{
+    type: String
+  }],
+  diet: [{
+    type: String
+  }],
+  pharmacy: [{
+    name: String,
+    frequency: String, // e.g., "2 times a day"
+    duration: String   // e.g., "5 days"
+  }],
+  // ----------------------------------------
   prescription: {
     type: String,
     default: ''
   },
-  // Array for multiple prescriptions
+  // Array for multiple prescriptions/documents
   prescriptions: [{
     url: { type: String, required: true },
     fileId: { type: String },
@@ -68,14 +81,10 @@ const appointmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// --- EXISTING INDEXES ---
+// Indexes
 appointmentSchema.index({ userId: 1 });
 appointmentSchema.index({ doctorUserId: 1 });
 appointmentSchema.index({ status: 1 });
-
-// --- NEW: PROPER BOOKING AUTHENTICATION INDEX ---
-// This Unique Compound Index prevents duplicate bookings at the DB level.
-// It says: "A doctor cannot have two appointments at the same date and time, UNLESS the status is 'cancelled'."
 appointmentSchema.index(
   { doctorId: 1, appointmentDate: 1, appointmentTime: 1 }, 
   { 
