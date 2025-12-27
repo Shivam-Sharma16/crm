@@ -16,6 +16,20 @@ export const fetchDoctorAppointments = createAsyncThunk(
   }
 );
 
+// Fetch Patient History
+export const fetchPatientHistory = createAsyncThunk(
+  'doctors/fetchPatientHistory',
+  async (patientId, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get(`/api/doctor/patients/${patientId}/history`);
+      if (response.data.success) return response.data.history;
+      return rejectWithValue(response.data.message);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch history');
+    }
+  }
+);
+
 // Cancel Appointment
 export const cancelAppointment = createAsyncThunk(
   'doctors/cancelAppointment',
@@ -91,12 +105,14 @@ const doctorSlice = createSlice({
   name: 'doctors',
   initialState: {
     appointments: [],
+    patientHistory: [],
     loading: false,
     error: null,
   },
   reducers: {
     clearAppointments: (state) => { state.appointments = []; },
     clearError: (state) => { state.error = null; },
+    clearHistory: (state) => { state.patientHistory = []; }
   },
   extraReducers: (builder) => {
     builder
@@ -113,6 +129,18 @@ const doctorSlice = createSlice({
       .addCase(fetchDoctorAppointments.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // Fetch History
+      .addCase(fetchPatientHistory.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchPatientHistory.fulfilled, (state, action) => {
+        state.loading = false;
+        state.patientHistory = action.payload;
+      })
+      .addCase(fetchPatientHistory.rejected, (state) => {
+        state.loading = false;
       })
 
       // Cancel Appointment
@@ -141,5 +169,5 @@ const doctorSlice = createSlice({
   },
 });
 
-export const { clearAppointments, clearError } = doctorSlice.actions;
+export const { clearAppointments, clearError, clearHistory } = doctorSlice.actions;
 export default doctorSlice.reducer;

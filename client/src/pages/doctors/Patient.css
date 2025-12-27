@@ -1,25 +1,392 @@
-/* --- Add these to client/src/pages/doctors/Patient.css --- */
+/* =========================================
+   1. DOCTOR DASHBOARD (List View) STYLES
+   ========================================= */
+
+.patient-page {
+  min-height: 100vh;
+  background-color: #f0f2f5;
+  padding: 40px 20px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.patient-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* --- Header Section --- */
+.patient-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  background: #fff;
+  padding: 20px 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.patient-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #1a1f36;
+}
+
+.patient-header p {
+  margin: 5px 0 0;
+  color: #697386;
+  font-size: 0.95rem;
+}
+
+.patient-user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.patient-user-info span {
+  font-weight: 600;
+  color: #1a1f36;
+}
+
+/* --- Buttons --- */
+.logout-btn {
+  background-color: #ff5252;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: #ff1744;
+}
+
+.availability-btn {
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.availability-btn:hover {
+  background-color: #1565c0;
+}
+
+/* --- Availability Panel --- */
+.availability-panel {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px dashed #1976d2;
+  text-align: center;
+  color: #666;
+}
+
+/* --- Tabs --- */
+.dashboard-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 0; /* Handled by inline styles in JSX, but good reset here */
+}
+
+/* --- Cards (Appointments & Patients List) --- */
+.appointments-card, 
+.patients-list-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 30px;
+  min-height: 400px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.appointments-card h2,
+.patients-list-card h2 {
+  margin-top: 0;
+  margin-bottom: 25px;
+  color: #1a1f36;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #f0f2f5;
+  padding-bottom: 15px;
+}
+
+/* --- Table Styling --- */
+.appointments-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.appointments-table table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px; /* Prevent squishing on small screens */
+}
+
+.appointments-table th {
+  background-color: #f7fafc;
+  color: #4a5568;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  padding: 16px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.appointments-table td {
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #2d3748;
+  font-size: 0.95rem;
+  vertical-align: middle;
+}
+
+.appointments-table tr:last-child td {
+  border-bottom: none;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.clickable-row:hover {
+  background-color: #f8faff;
+}
+
+/* --- Action Buttons in Table --- */
+.view-btn {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.view-btn:hover {
+  background-color: #1976d2;
+  color: white;
+}
+
+.cancel-btn {
+  background-color: #fff;
+  color: #e53935;
+  border: 1px solid #ffcdd2;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.cancel-btn:hover {
+  background-color: #ffebee;
+  border-color: #e53935;
+}
+
+/* --- Status Badges --- */
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-block;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.pending {
+  background-color: #fff8e1;
+  color: #f57c00;
+}
+
+.status-badge.confirmed {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.completed {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.status-badge.cancelled {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+/* --- States --- */
+.loading-message, .empty-message {
+  text-align: center;
+  padding: 40px;
+  color: #697386;
+  font-size: 1.1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #ffcdd2;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================
+   2. PATIENT DETAILS (Single View) STYLES
+   (Used by DoctorPatientDetails.jsx)
+   ========================================= */
 
 /* Wrapper for the details card */
 .doctor-details-card {
-  max-width: 800px;
-  margin: 20px auto;
-  padding: 30px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.doctor-details-card h1 {
+    color: #1a1f36;
+    margin-bottom: 20px;
+}
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.patient-id-badge {
+    background: #e0f2f1;
+    color: #00695c;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 1rem;
+    border: 1px solid #b2dfdb;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 20px;
+    padding: 0;
+    font-weight: 500;
+}
+
+.back-button:hover {
+    color: #1976d2;
+    text-decoration: underline;
+}
+
+.patient-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    border: 1px solid #eee;
+}
+
+.patient-info-grid div {
+    color: #4a5568;
+}
+
+.patient-info-grid strong {
+    color: #1a1f36;
+    display: block;
+    margin-bottom: 5px;
 }
 
 .divider {
-  margin: 25px 0;
+  margin: 30px 0;
   border: 0;
-  border-top: 1px solid #eee;
+  border-top: 1px solid #e0e0e0;
 }
 
+/* --- History Section --- */
+.history-section {
+    margin-bottom: 30px;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.history-item {
+    display: grid;
+    grid-template-columns: 120px 150px 100px 1fr;
+    gap: 15px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.history-item:hover {
+    background: #f9f9f9;
+}
+
+.history-date { font-weight: 600; color: #333; }
+.history-status { 
+    text-transform: capitalize; 
+    font-size: 0.85rem; 
+    padding: 2px 8px; 
+    border-radius: 10px; 
+    background: #eee; 
+    text-align: center;
+}
+.history-notes { color: #666; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* --- MultiSelect Dropdown Styling --- */
+.form-group-row {
+    margin-bottom: 25px;
+}
+
 .multiselect-container {
-  position: relative; /* CRITICAL: Establishes context for absolute menu */
-  margin-bottom: 20px;
+  position: relative;
   width: 100%;
 }
 
@@ -27,14 +394,14 @@
   display: block;
   font-weight: 600;
   margin-bottom: 8px;
-  color: #333;
-  font-size: 14px;
+  color: #374151;
+  font-size: 0.95rem;
 }
 
 .multiselect-header {
-  border: 1px solid #ddd;
-  padding: 12px;
-  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  padding: 12px 16px;
+  border-radius: 8px;
   cursor: pointer;
   background: #fff;
   display: flex;
@@ -50,141 +417,138 @@
 
 .multiselect-header.open {
   border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
 }
 
-.multiselect-arrow {
-  font-size: 12px;
-  color: #666;
-}
-
-/* The Dropdown Menu - Floats above content */
 .multiselect-menu {
-  position: absolute; /* Floats above content */
-  top: 100%;          /* Pushes it directly below the header */
+  position: absolute;
+  top: 100%;
   left: 0;
   right: 0;
-  border: 1px solid #cfcfcf;
-  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
   background: #fff;
-  z-index: 1000;      /* Ensure it sits on top of everything */
-  max-height: 250px;
-  overflow-y: auto;   /* Scroll if too many items */
-  box-shadow: 0 5px 15px rgba(0,0,0,0.15);
-  margin-top: 4px;
+  z-index: 100;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  margin-top: 5px;
 }
 
 .multiselect-item {
-  padding: 10px 12px;
+  padding: 12px 16px;
   cursor: pointer;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #f3f4f6;
   display: flex;
   align-items: center;
-  font-size: 14px;
-  color: #444;
+  font-size: 0.95rem;
+  color: #4b5563;
   transition: background 0.15s;
 }
 
-.multiselect-item:last-child {
-  border-bottom: none;
-}
-
 .multiselect-item:hover {
-  background-color: #f0f7ff;
+  background-color: #f9fafb;
 }
 
 .multiselect-item.selected {
-  background-color: #e3f2fd;
-  color: #1565c0;
+  background-color: #eff6ff;
+  color: #1d4ed8;
   font-weight: 500;
 }
 
 .multiselect-checkbox {
   margin-right: 12px;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   accent-color: #1976d2;
   cursor: pointer;
 }
 
-/* Selected Tags Area */
+/* Selected Tags */
 .multiselect-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .multiselect-tag {
-  background: #e3f2fd;
-  color: #1565c0;
-  padding: 4px 10px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 6px 12px;
   border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 0.85rem;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  border: 1px solid #bae6fd;
 }
 
 .tag-remove {
   cursor: pointer;
   font-weight: bold;
-  font-size: 14px;
-  color: #1565c0;
+  font-size: 16px;
+  color: #0284c7;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
+  transition: background 0.2s;
 }
 
 .tag-remove:hover {
-  background-color: rgba(21, 101, 192, 0.1);
+  background-color: rgba(2, 132, 199, 0.1);
 }
 
 /* --- Pharmacy Detail Box --- */
 .pharmacy-details-box {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #eee;
-  margin-top: 15px;
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-top: 20px;
 }
 
 .pharmacy-details-box h4 {
   margin-top: 0;
-  margin-bottom: 12px;
-  font-size: 14px;
-  color: #333;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
 .medication-row {
   display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 15px;
+  margin-bottom: 12px;
   align-items: center;
 }
 
 .med-name {
   flex: 1;
   font-weight: 600;
-  font-size: 13px;
-  color: #333;
+  font-size: 0.95rem;
+  color: #334155;
 }
 
 .med-input {
   flex: 1;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
 }
 
-/* --- Prescriptions/Documents --- */
+/* --- Documents Section --- */
+.prescriptions-section {
+    margin-bottom: 30px;
+}
+
 .prescriptions-list {
   display: flex;
   flex-wrap: wrap;
@@ -192,75 +556,130 @@
 }
 
 .prescription-item {
-  border: 1px solid #ddd;
-  padding: 10px;
+  border: 1px solid #e2e8f0;
+  padding: 15px;
   border-radius: 8px;
   width: 140px;
   background: #fff;
-  transition: transform 0.2s;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .prescription-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
 }
 
 .doc-link {
   text-decoration: none;
   color: inherit;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
+  width: 100%;
 }
 
 .doc-icon {
   font-size: 32px;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 .doc-name {
-  font-size: 12px;
+  font-size: 0.85rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
   font-weight: 500;
+  color: #475569;
 }
 
 .doc-remove-btn {
   width: 100%;
-  margin-top: 8px;
-  background: #ffebee;
-  border: none;
-  color: #d32f2f;
+  margin-top: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
   cursor: pointer;
-  font-size: 11px;
-  padding: 4px;
+  font-size: 0.75rem;
+  padding: 6px;
   border-radius: 4px;
   font-weight: 600;
+  transition: all 0.2s;
 }
 
 .doc-remove-btn:hover {
-  background: #ffcdd2;
+  background: #fee2e2;
+}
+
+/* --- Inputs and Final Actions --- */
+.section-title {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #1e293b;
+}
+
+.file-input {
+    margin-bottom: 15px;
+}
+
+.preview-container {
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    display: inline-block;
 }
 
 .preview-container img {
   max-width: 200px;
   border-radius: 4px;
-  border: 1px solid #ddd;
-  margin-bottom: 15px;
+  display: block;
 }
 
 .notes-input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  padding: 15px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   font-family: inherit;
+  font-size: 1rem;
   resize: vertical;
+  min-height: 100px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.notes-input:focus {
+    outline: 2px solid #1976d2;
+    border-color: transparent;
 }
 
 .save-btn {
   width: 100%;
-  padding: 12px;
-  font-size: 16px;
-  margin-top: 10px;
+  padding: 14px;
+  font-size: 1rem;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.save-btn:hover {
+  background-color: #1565c0;
+  transform: translateY(-1px);
+}
+
+.save-btn:disabled {
+    background-color: #94a3b8;
+    cursor: not-allowed;
+    transform: none;
 }

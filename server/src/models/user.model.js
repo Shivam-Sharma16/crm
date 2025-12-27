@@ -29,6 +29,12 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin', 'administrator', 'doctor', 'lab', 'pharmacy', 'reception'],
     default: 'user'
   },
+  patientId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allows null/undefined for non-patient roles
+    trim: true
+  },
   services: {
     type: [String],
     default: [],
@@ -64,19 +70,16 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 // Add indexes for better query performance
-userSchema.index({ email: 1 }); // Index for email lookups (already unique, but explicit index helps)
-userSchema.index({ role: 1 }); // Index for filtering by role
+userSchema.index({ email: 1 }); 
+userSchema.index({ role: 1 }); 
+userSchema.index({ patientId: 1 });
 
 const User = mongoose.model('User', userSchema);
 
 // Drop old username index if it exists (migration fix)
-// This handles the case where an old schema had a username field with unique index
-// We use a post-initialization hook to ensure the connection is ready
 if (mongoose.connection.readyState === 1) {
-  // Connection is already open
   dropOldUsernameIndex();
 } else {
-  // Wait for connection
   mongoose.connection.once('open', () => {
     dropOldUsernameIndex();
   });
@@ -90,8 +93,6 @@ async function dropOldUsernameIndex() {
       console.log('✓ Dropped old username_1 index successfully');
     }
   } catch (err) {
-    // Index might not exist or already dropped, or collection might not exist. Ignore these errors.
-    // Code 26 is "NamespaceNotFound", Code 27 is "IndexNotFound"
     if (err.code !== 27 && err.code !== 26 && err.codeName !== 'IndexNotFound' && err.codeName !== 'NamespaceNotFound') {
       console.error('Error checking/dropping username index:', err.message);
     }

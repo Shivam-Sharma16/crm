@@ -1,19 +1,44 @@
 const mongoose = require('mongoose');
 
+// Define a sub-schema for Pharmacy items to ensure structure
+const pharmacyItemSchema = new mongoose.Schema({
+  medicineName: { 
+    type: String, 
+    required: [true, 'Medicine name is required'],
+    trim: true
+  },
+  frequency: { 
+    type: String, 
+    default: '',
+    trim: true
+  }, // e.g., "2 times a day"
+  duration: { 
+    type: String, 
+    default: '',
+    trim: true
+  }   // e.g., "5 days"
+}, { _id: false }); // No need for individual IDs for embedded items
+
 const appointmentSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'User ID is required']
   },
+  patientId: {
+    type: String, // Persisted Patient ID (e.g., P-101)
+    required: false,
+    index: true
+  },
   doctorId: {
-    type: mongoose.Schema.Types.Mixed, // Storing as Mixed to handle both String (legacy) and ObjectId
+    type: mongoose.Schema.Types.Mixed,
     required: true
   },
   doctorUserId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: false
+    required: false,
+    index: true
   },
   doctorName: {
     type: String,
@@ -38,7 +63,8 @@ const appointmentSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'completed', 'cancelled'],
-    default: 'pending'
+    default: 'pending',
+    index: true
   },
   paymentStatus: {
     type: String,
@@ -51,26 +77,36 @@ const appointmentSchema = new mongoose.Schema({
   },
   notes: {
     type: String,
-    default: ''
+    default: '' // Used for Diagnosis/General Notes
   },
-  // --- NEW FIELDS: IVF TREATMENT DETAILS ---
+  
+  // ================================================
+  // NEW: EMBEDDED STRUCTURED DATA FROM DROPDOWNS
+  // ================================================
+  
+  // 1. Lab Tests: Array of strings selected from dropdown
   labTests: [{
-    type: String
+    type: String,
+    trim: true
   }],
-  diet: [{
-    type: String
+
+  // 2. Diet Plan: Array of strings selected from dropdown
+  dietPlan: [{
+    type: String,
+    trim: true
   }],
-  pharmacy: [{
-    name: String,
-    frequency: String, // e.g., "2 times a day"
-    duration: String   // e.g., "5 days"
-  }],
-  // ----------------------------------------
+
+  // 3. Pharmacy: Array of structured objects containing details
+  pharmacy: [pharmacyItemSchema],
+  
+  // ================================================
+
+  // Legacy single prescription file
   prescription: {
     type: String,
     default: ''
   },
-  // Array for multiple prescriptions/documents
+  // Modern multiple prescription files support
   prescriptions: [{
     url: { type: String, required: true },
     fileId: { type: String },
@@ -81,16 +117,10 @@ const appointmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
-appointmentSchema.index({ userId: 1 });
-appointmentSchema.index({ doctorUserId: 1 });
-appointmentSchema.index({ status: 1 });
+// Compound index for checking availability
 appointmentSchema.index(
   { doctorId: 1, appointmentDate: 1, appointmentTime: 1 }, 
-  { 
-    unique: true, 
-    partialFilterExpression: { status: { $ne: 'cancelled' } } 
-  }
+  { unique: true, partialFilterExpression: { status: { $ne: 'cancelled' } } }
 );
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);

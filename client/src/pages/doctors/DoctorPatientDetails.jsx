@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
-import { updatePrescription, deletePrescription } from '../../store/slices/doctorSlice';
+import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
 import './Patient.css'; // Ensure this is imported
 
 // --- IVF RELATED DATA CONSTANTS ---
@@ -135,7 +135,7 @@ const DoctorPatientDetails = () => {
   const { appointmentId } = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { appointments } = useDoctors();
+  const { appointments, patientHistory } = useDoctors();
   
   const appointment = appointments.find(a => a._id === appointmentId);
   
@@ -144,27 +144,38 @@ const DoctorPatientDetails = () => {
   const [notes, setNotes] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- NEW STATES ---
+  // --- STATES ---
   const [selectedLabs, setSelectedLabs] = useState([]);
   const [selectedDiet, setSelectedDiet] = useState([]);
   
-  // Pharmacy is complex: Need to select meds, then add details for each
-  const [selectedMedNames, setSelectedMedNames] = useState([]); // Just the names for the dropdown
-  const [pharmacyDetails, setPharmacyDetails] = useState([]); // The actual objects {name, frequency, duration}
+  // Pharmacy
+  const [selectedMedNames, setSelectedMedNames] = useState([]); 
+  const [pharmacyDetails, setPharmacyDetails] = useState([]);
 
   useEffect(() => {
     if (appointment) {
       setNotes(appointment.notes || '');
       if (appointment.labTests) setSelectedLabs(appointment.labTests);
-      if (appointment.diet) setSelectedDiet(appointment.diet);
+      if (appointment.dietPlan || appointment.diet) setSelectedDiet(appointment.dietPlan || appointment.diet);
       if (appointment.pharmacy) {
-        setPharmacyDetails(appointment.pharmacy);
-        setSelectedMedNames(appointment.pharmacy.map(p => p.name));
+        // Map backend structure (medicineName) to frontend structure (name)
+        const mappedPharmacy = appointment.pharmacy.map(p => ({
+            name: p.medicineName || p.name,
+            frequency: p.frequency || '',
+            duration: p.duration || ''
+        }));
+        setPharmacyDetails(mappedPharmacy);
+        setSelectedMedNames(mappedPharmacy.map(p => p.name));
+      }
+
+      // Fetch History if we have a patientId (or userId)
+      const pId = appointment.patientId || appointment.userId?._id;
+      if (pId) {
+          dispatch(fetchPatientHistory(pId));
       }
     }
-  }, [appointment]);
+  }, [appointment, dispatch]);
 
-  // Handle Pharmacy Selection Change
   const handleMedNameChange = (newNames) => {
     setSelectedMedNames(newNames);
     
@@ -201,14 +212,14 @@ const DoctorPatientDetails = () => {
     formData.append('diagnosis', notes);
     formData.append('status', 'completed');
 
-    // Append JSON strings for arrays
+    // Append JSON strings for complex arrays
     formData.append('labTests', JSON.stringify(selectedLabs));
-    formData.append('diet', JSON.stringify(selectedDiet));
+    formData.append('dietPlan', JSON.stringify(selectedDiet));
     formData.append('pharmacy', JSON.stringify(pharmacyDetails));
 
     try {
       await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
-      alert('Updated successfully!');
+      alert('Treatment plan updated successfully!');
       setFile(null);
       setPreview(null);
     } catch (err) {
@@ -237,14 +248,20 @@ const DoctorPatientDetails = () => {
   };
 
   const prescriptionsList = getPrescriptionsList();
+  
+  // Get patient identifier string
+  const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
 
   return (
     <div className="patient-page">
       <div className="patient-container">
         <button onClick={() => navigate('/doctor/patients')} className="back-button">← Back to List</button>
         
-        <div className="auth-card doctor-details-card">
-            <h1>IVF Patient Consultation</h1>
+        <div className="doctor-details-card">
+            <div className="header-row">
+                <h1>IVF Patient Consultation</h1>
+                <span className="patient-id-badge">{patientDisplayId}</span>
+            </div>
             
             <div className="patient-info-grid">
                 <div><strong>Patient:</strong> {appointment.userId?.name}</div>
@@ -254,7 +271,29 @@ const DoctorPatientDetails = () => {
 
             <hr className="divider" />
 
-            {/* --- NEW SECTION: IVF DATA --- */}
+            {/* --- PATIENT HISTORY SECTION --- */}
+            {patientHistory && patientHistory.length > 0 && (
+                <div className="history-section">
+                    <h3>Patient History</h3>
+                    <div className="history-list">
+                        {patientHistory.filter(h => h._id !== appointment._id).map((hist, idx) => (
+                            <div key={idx} className="history-item">
+                                <div className="history-date">{new Date(hist.appointmentDate).toLocaleDateString()}</div>
+                                <div className="history-service">{hist.serviceName}</div>
+                                <div className="history-status">{hist.status}</div>
+                                <div className="history-notes">{hist.notes || 'No notes'}</div>
+                            </div>
+                        ))}
+                        {patientHistory.filter(h => h._id !== appointment._id).length === 0 && (
+                            <p className="no-history">No previous visits recorded.</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <hr className="divider" />
+
+            {/* --- TREATMENT PLAN --- */}
             <h3>Treatment Plan</h3>
             
             <div className="form-group-row">

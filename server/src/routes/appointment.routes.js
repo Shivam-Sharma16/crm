@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Appointment = require('../models/appointment.model');
 const Doctor = require('../models/doctor.model');
+const User = require('../models/user.model'); // Added User model to fetch patientId
 const { verifyToken } = require('../middleware/auth.middleware');
 
 // Create Appointment
@@ -14,7 +15,14 @@ router.post('/create', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields (doctorId, date, or time)' });
     }
 
-    // 1. Find Doctor
+    // --- 0. Fetch User to get persistent Patient ID ---
+    const user = await User.findById(userId);
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const patientId = user.patientId; 
+
+    // --- 1. Find Doctor ---
     let doctorDoc = await Doctor.findOne({
       $or: [
         { _id: (doctorId.match(/^[0-9a-fA-F]{24}$/) ? doctorId : null) },
@@ -27,7 +35,7 @@ router.post('/create', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Doctor not found.' });
     }
 
-    // 2. Validate Date
+    // --- 2. Validate Date ---
     const today = new Date();
     const reqDate = new Date(appointmentDate);
     const todayStr = today.toISOString().split('T')[0];
@@ -37,7 +45,7 @@ router.post('/create', verifyToken, async (req, res) => {
         return res.status(400).json({ success: false, message: 'Cannot book appointments in the past.' });
     }
 
-    // 3. Validate Time
+    // --- 3. Validate Time ---
     if (reqDateStr === todayStr) {
         const currentHours = today.getHours();
         const currentMinutes = today.getMinutes();
@@ -50,7 +58,7 @@ router.post('/create', verifyToken, async (req, res) => {
         }
     }
 
-    // 4. Check Availability
+    // --- 4. Check Availability ---
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayName = days[reqDate.getDay()];
     
@@ -71,7 +79,7 @@ router.post('/create', verifyToken, async (req, res) => {
         }
     }
 
-    // 5. Check for Double Booking
+    // --- 5. Check for Double Booking ---
     const existingAppointment = await Appointment.findOne({
         doctorId: doctorDoc._id,
         appointmentDate: new Date(reqDateStr),
@@ -83,9 +91,10 @@ router.post('/create', verifyToken, async (req, res) => {
         return res.status(400).json({ success: false, message: 'This slot is already booked.' });
     }
 
-    // 6. Save Appointment
+    // --- 6. Save Appointment ---
     const appointment = new Appointment({
       userId: userId,
+      patientId: patientId, // Persist the patient ID
       doctorId: doctorDoc._id,
       doctorUserId: doctorDoc.userId,
       doctorName: doctorDoc.name,
@@ -96,7 +105,11 @@ router.post('/create', verifyToken, async (req, res) => {
       amount: amount || doctorDoc.consultationFee || 500,
       notes: notes || '',
       status: 'pending',
-      paymentStatus: 'pending'
+      paymentStatus: 'pending',
+      // Initialize arrays to ensure they exist
+      labTests: [],
+      dietPlan: [],
+      pharmacy: []
     });
 
     await appointment.save();
@@ -108,16 +121,21 @@ router.post('/create', verifyToken, async (req, res) => {
   }
 });
 
-// Get My Appointments (Will include labTests, diet, pharmacy)
+// Get My Appointments (Explicitly including new treatment fields)
 router.get('/my-appointments', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
+    // We explicitly select the new fields to ensure the frontend receives them
     const appointments = await Appointment.find({ userId })
-      .sort({ appointmentDate: -1, appointmentTime: -1 });
+      .select('userId patientId doctorId doctorName serviceName appointmentDate appointmentTime status paymentStatus amount notes prescription prescriptions labTests dietPlan pharmacy')
+      .sort({ appointmentDate: -1, appointmentTime: -1 })
+      .lean(); // Use lean for performance
+      
     res.status(200).json({ success: true, appointments });
   } catch (error) {
+    console.error('Fetch appointments error:', error);
     res.status(500).json({ success: false, message: 'Error fetching appointments' });
   }
 });
 
-module.exports = router;
+module.exports = router;  
