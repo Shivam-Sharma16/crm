@@ -132,12 +132,20 @@ router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
   }
 });
 
-// UPLOAD Prescription & Update Treatment Details
+// UPLOAD Prescription & Update Treatment Details (FIXED WITH LOGS)
 router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
   try {
+    // --- DEBUG LOG START ---
+    console.log(`[DOCTOR] Updating Prescription for ID: ${req.params.id}`);
+    console.log(`[DOCTOR] Req Body Keys:`, Object.keys(req.body));
+    // Check raw values to see if they are arriving
+    console.log(`[DOCTOR] Raw LabTests:`, req.body.labTests);
+    console.log(`[DOCTOR] Raw DietPlan:`, req.body.dietPlan);
+    console.log(`[DOCTOR] Raw Pharmacy:`, req.body.pharmacy);
+    // ---------------------
+
     if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
 
-    // Extract textual data. Note: 'diet' might be sent as 'dietPlan'
     const { status, diagnosis, labTests, diet, dietPlan, pharmacy } = req.body;
     const appointmentId = req.params.id;
     const doctorUserId = req.user.id || req.user.userId;
@@ -145,8 +153,9 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     const appointment = await Appointment.findOne({ _id: appointmentId, doctorUserId });
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
-    // Handle File Upload (Preserves existing logic)
+    // Handle File Upload
     if (req.file) {
+        console.log(`[DOCTOR] File uploaded: ${req.file.originalname}`);
         const result = await imagekit.upload({
           file: req.file.buffer,
           fileName: `prescription_${appointmentId}_${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`,
@@ -155,10 +164,9 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
           useUniqueFileName: true
         });
 
-        // Initialize array if undefined
         if (!appointment.prescriptions) appointment.prescriptions = [];
 
-        // Migrate legacy single prescription if needed
+        // Migrate legacy
         if (appointment.prescription && appointment.prescriptions.length === 0) {
              appointment.prescriptions.push({
                  url: appointment.prescription,
@@ -167,7 +175,6 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
              });
         }
         
-        // Add new file
         appointment.prescriptions.push({
             url: result.url,
             fileId: result.fileId,
@@ -175,7 +182,6 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
             uploadedAt: new Date()
         });
         
-        // Update legacy pointer to latest
         appointment.prescription = result.url;
     }
 
@@ -183,40 +189,47 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     if (status) appointment.status = status;
     if (diagnosis) appointment.notes = diagnosis; 
 
-    // Update Complex Fields (Parse JSON if string due to FormData)
+    // --- FIX: Robust Parsing for Complex Fields ---
     
     // 1. Lab Tests
     if (labTests) {
       try {
-        appointment.labTests = typeof labTests === 'string' ? JSON.parse(labTests) : labTests;
-      } catch (e) { console.error("Error parsing labTests:", e); }
+        // If it's already an array (unlikely with FormData), use it. If string, parse it.
+        const parsed = typeof labTests === 'string' ? JSON.parse(labTests) : labTests;
+        appointment.labTests = Array.isArray(parsed) ? parsed : [];
+        console.log(`[DOCTOR] Parsed LabTests:`, appointment.labTests);
+      } catch (e) { console.error("[DOCTOR] Error parsing labTests:", e); }
     }
 
-    // 2. Diet Plan (Handle both 'diet' and 'dietPlan' keys)
+    // 2. Diet Plan
     const dietData = dietPlan || diet;
     if (dietData) {
       try {
-        appointment.dietPlan = typeof dietData === 'string' ? JSON.parse(dietData) : dietData;
-      } catch (e) { console.error("Error parsing dietPlan:", e); }
+        const parsed = typeof dietData === 'string' ? JSON.parse(dietData) : dietData;
+        appointment.dietPlan = Array.isArray(parsed) ? parsed : [];
+        console.log(`[DOCTOR] Parsed DietPlan:`, appointment.dietPlan);
+      } catch (e) { console.error("[DOCTOR] Error parsing dietPlan:", e); }
     }
 
     // 3. Pharmacy
     if (pharmacy) {
       try {
         const parsedPharmacy = typeof pharmacy === 'string' ? JSON.parse(pharmacy) : pharmacy;
-        // Map frontend "name" to backend "medicineName"
         if (Array.isArray(parsedPharmacy)) {
             appointment.pharmacy = parsedPharmacy.map(item => ({
-                medicineName: item.name || item.medicineName,
+                medicineName: item.name || item.medicineName, // Map frontend 'name' to backend 'medicineName'
                 frequency: item.frequency || '',
                 duration: item.duration || ''
             }));
+            console.log(`[DOCTOR] Parsed Pharmacy (${appointment.pharmacy.length} items)`);
         }
-      } catch (e) { console.error("Error parsing pharmacy:", e); }
+      } catch (e) { console.error("[DOCTOR] Error parsing pharmacy:", e); }
     }
 
-    await appointment.save();
-    res.json({ success: true, message: 'Treatment plan updated', appointment });
+    const savedDoc = await appointment.save();
+    console.log(`[DOCTOR] Save Successful. Updated Fields:`, Object.keys(savedDoc.toObject()));
+    
+    res.json({ success: true, message: 'Treatment plan updated', appointment: savedDoc });
   } catch (error) {
     console.error('Prescription update error:', error);
     res.status(500).json({ success: false, message: 'Update failed', error: error.message });

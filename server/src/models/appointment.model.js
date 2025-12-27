@@ -75,12 +75,30 @@ const appointmentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  
+  // --- FIELDS THAT WERE PREVIOUSLY MISSING OR NOT SAVING ---
+  
+  // 1. General Notes
   notes: {
     type: String,
-    default: '' // Used for Diagnosis/General Notes
+    default: '' 
   },
   
-  // --- NEW FIELDS FOR TREATMENT PLAN ---
+  // 2. Clinical Data
+  doctorNotes: {
+    type: String,
+    default: ''
+  },
+  symptoms: {
+    type: String,
+    default: ''
+  },
+  diagnosis: {
+    type: String,
+    default: ''
+  },
+
+  // 3. Treatment Plans (Arrays)
   labTests: [{
     type: String,
     trim: true
@@ -91,7 +109,13 @@ const appointmentSchema = new mongoose.Schema({
     trim: true
   }],
 
-  pharmacy: [pharmacyItemSchema],
+  pharmacy: [pharmacyItemSchema], // Maps to 'medicines' in frontend
+
+  // 4. IVF Specific Data (Flexible Object)
+  ivfDetails: {
+    type: mongoose.Schema.Types.Mixed, // Allows generic object structure
+    default: {}
+  },
   // -------------------------------------
 
   // Legacy single prescription file

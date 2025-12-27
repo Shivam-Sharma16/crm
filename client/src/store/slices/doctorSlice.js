@@ -58,11 +58,18 @@ export const updateAvailability = createAsyncThunk(
   }
 );
 
-// Update Prescription (Upload)
+// Update Prescription (Upload) - WITH DEBUG LOGS
 export const updatePrescription = createAsyncThunk(
   'doctors/updatePrescription',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
     try {
+      // --- DEBUG LOG START ---
+      console.log("--- Doctor Slice: Sending FormData ---");
+      for (let [key, value] of formData.entries()) {
+          console.log(`${key}:`, value);
+      }
+      // ---------------------
+
       // Content-Type: undefined allows the browser to automatically set the boundary
       const config = {
         headers: {
