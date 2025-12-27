@@ -403,7 +403,7 @@ const DoctorPatientDetails = () => {
               className="auth-button save-btn"
               disabled={isUploading}
             >
-              {isUploading ? 'Save Treatment Plan' : 'Save & Update'}
+              {isUploading ? 'Saving...' : 'Save Treatment Plan'}
             </button>
         </div>
       </div>

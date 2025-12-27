@@ -21,7 +21,7 @@ const PrescriptionModal = ({ appointment, onClose }) => {
     <div className="details-modal-overlay" onClick={onClose}>
       <div className="details-modal-content animate-on-scroll visible" onClick={e => e.stopPropagation()}>
         <div className="details-header">
-          <h2>Prescription Details</h2>
+          <h2>Treatment Details</h2>
           <button className="close-details-btn" onClick={onClose}>×</button>
         </div>
         <div className="details-body">

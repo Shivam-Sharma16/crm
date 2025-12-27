@@ -82,7 +82,6 @@ router.get('/appointments', verifyToken, async (req, res) => {
     const doctorUserId = req.user.id || req.user.userId;
     
     const appointments = await Appointment.find({ doctorUserId })
-      // Updated select to include dietPlan
       .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes prescription prescriptions labTests dietPlan pharmacy')
       .populate('userId', 'name email phone patientId')
       .sort({ appointmentDate: 1, appointmentTime: 1 })
@@ -146,7 +145,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     const appointment = await Appointment.findOne({ _id: appointmentId, doctorUserId });
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
-    // Handle File Upload
+    // Handle File Upload (Preserves existing logic)
     if (req.file) {
         const result = await imagekit.upload({
           file: req.file.buffer,
@@ -156,21 +155,27 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
           useUniqueFileName: true
         });
 
-        if (appointment.prescriptions) {
-            if (appointment.prescription && appointment.prescriptions.length === 0) {
-                 appointment.prescriptions.push({
-                     url: appointment.prescription,
-                     name: 'Previous Prescription',
-                     uploadedAt: new Date(appointment.updatedAt)
-                 });
-            }
-            appointment.prescriptions.push({
-                url: result.url,
-                fileId: result.fileId,
-                name: req.file.originalname,
-                uploadedAt: new Date()
-            });
+        // Initialize array if undefined
+        if (!appointment.prescriptions) appointment.prescriptions = [];
+
+        // Migrate legacy single prescription if needed
+        if (appointment.prescription && appointment.prescriptions.length === 0) {
+             appointment.prescriptions.push({
+                 url: appointment.prescription,
+                 name: 'Previous Prescription',
+                 uploadedAt: new Date(appointment.updatedAt)
+             });
         }
+        
+        // Add new file
+        appointment.prescriptions.push({
+            url: result.url,
+            fileId: result.fileId,
+            name: req.file.originalname,
+            uploadedAt: new Date()
+        });
+        
+        // Update legacy pointer to latest
         appointment.prescription = result.url;
     }
 
@@ -178,7 +183,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     if (status) appointment.status = status;
     if (diagnosis) appointment.notes = diagnosis; 
 
-    // Update Complex Fields (Parse JSON if string)
+    // Update Complex Fields (Parse JSON if string due to FormData)
     
     // 1. Lab Tests
     if (labTests) {
@@ -291,7 +296,7 @@ router.get('/patients', verifyToken, async (req, res) => {
   }
 });
 
-// GET Patient History (Previous Appointments with this Doctor)
+// GET Patient History
 router.get('/patients/:patientId/history', verifyToken, async (req, res) => {
     try {
         if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
@@ -299,19 +304,15 @@ router.get('/patients/:patientId/history', verifyToken, async (req, res) => {
         const { patientId } = req.params;
         const doctorUserId = req.user.id || req.user.userId;
 
-        // Find appointments matching patientId or userId
-        // If patientId starts with P-, treat as persistent ID. Else treat as ObjectId.
         let query = { doctorUserId };
-        
         if (patientId.startsWith('P-')) {
             query.patientId = patientId;
         } else {
-            query.userId = patientId; // Fallback if old ID passed
+            query.userId = patientId; 
         }
 
         const history = await Appointment.find(query)
             .sort({ appointmentDate: -1 })
-            // Updated select to include dietPlan
             .select('appointmentDate appointmentTime serviceName status notes prescription prescriptions labTests dietPlan pharmacy')
             .lean();
 
@@ -328,9 +329,7 @@ router.get('/:doctorId/booked-slots', async (req, res) => {
     const { doctorId } = req.params;
     const { date } = req.query;
 
-    if (!date) {
-      return res.status(400).json({ success: false, message: 'Date is required' });
-    }
+    if (!date) return res.status(400).json({ success: false, message: 'Date is required' });
 
     const queryDate = new Date(date);
     

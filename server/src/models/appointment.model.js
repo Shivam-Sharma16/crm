@@ -17,7 +17,7 @@ const pharmacyItemSchema = new mongoose.Schema({
     default: '',
     trim: true
   }   // e.g., "5 days"
-}, { _id: false }); // No need for individual IDs for embedded items
+}, { _id: false });
 
 const appointmentSchema = new mongoose.Schema({
   userId: {
@@ -26,7 +26,7 @@ const appointmentSchema = new mongoose.Schema({
     required: [true, 'User ID is required']
   },
   patientId: {
-    type: String, // Persisted Patient ID (e.g., P-101)
+    type: String,
     required: false,
     index: true
   },
@@ -80,26 +80,19 @@ const appointmentSchema = new mongoose.Schema({
     default: '' // Used for Diagnosis/General Notes
   },
   
-  // ================================================
-  // NEW: EMBEDDED STRUCTURED DATA FROM DROPDOWNS
-  // ================================================
-  
-  // 1. Lab Tests: Array of strings selected from dropdown
+  // --- NEW FIELDS FOR TREATMENT PLAN ---
   labTests: [{
     type: String,
     trim: true
   }],
 
-  // 2. Diet Plan: Array of strings selected from dropdown
   dietPlan: [{
     type: String,
     trim: true
   }],
 
-  // 3. Pharmacy: Array of structured objects containing details
   pharmacy: [pharmacyItemSchema],
-  
-  // ================================================
+  // -------------------------------------
 
   // Legacy single prescription file
   prescription: {
