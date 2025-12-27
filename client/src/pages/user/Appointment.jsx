@@ -356,8 +356,20 @@ const Appointment = () => {
     });
   };
 
-  // --- NEW: Helper to Open Details Modal ---
+  // --- MODIFIED: Helper to Open Details Modal with Debugging ---
   const handleViewDetails = (apt) => {
+    // 1. Log the entire object being passed to the modal
+    console.log("--- OPENING DETAILS MODAL ---");
+    console.log("Appointment Object ID:", apt._id || apt.id);
+    console.log("Full Object:", apt);
+    
+    // 2. Check for the specific fields you mentioned were missing
+    console.log("Checking specific fields:");
+    console.log(" - Lab Tests:", apt.labTests ? `Found (${apt.labTests.length})` : "MISSING/UNDEFINED");
+    console.log(" - Diet:", apt.diet ? `Found (${apt.diet.length})` : "MISSING/UNDEFINED");
+    console.log(" - Pharmacy:", apt.pharmacy ? `Found (${apt.pharmacy.length})` : "MISSING/UNDEFINED");
+    console.log(" - Notes:", apt.notes || "MISSING/UNDEFINED");
+
     setSelectedAppointment(apt);
     setShowDetailsModal(true);
   };
@@ -491,7 +503,7 @@ const Appointment = () => {
                           </span>
                           {upcoming && <span className="upcoming-badge">Upcoming</span>}
                         </div>
-                       
+                        
                       </div>
 
                       <div className="appointment-card-body">
@@ -514,7 +526,6 @@ const Appointment = () => {
                           </div>
                         </div>
 
-                        {/* --- MODIFIED: View Details Button --- */}
                         <div style={{marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '1rem'}}>
                             <button 
                                 onClick={() => handleViewDetails(appointment)}
@@ -579,7 +590,7 @@ const Appointment = () => {
         </div>
       )}
 
-      {/* --- NEW: Details Modal --- */}
+      {/* --- DETAILS MODAL WITH DEBUGGING --- */}
       {showDetailsModal && selectedAppointment && (
         <div className="details-modal-overlay" onClick={() => setShowDetailsModal(false)}>
             <div className="details-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -599,33 +610,37 @@ const Appointment = () => {
                     <hr />
 
                     {/* IVF Labs */}
-                    {selectedAppointment.labTests && selectedAppointment.labTests.length > 0 && (
-                        <div className="detail-section">
-                            <h4>🧬 Lab Tests Prescribed</h4>
+                    <div className="detail-section">
+                        <h4>🧬 Lab Tests Prescribed</h4>
+                        {selectedAppointment.labTests && selectedAppointment.labTests.length > 0 ? (
                             <div className="tags-container">
                                 {selectedAppointment.labTests.map((lab, i) => (
                                     <span key={i} className="detail-tag lab-tag">{lab}</span>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <p style={{fontStyle:'italic', color:'#888'}}>No lab tests found.</p>
+                        )}
+                    </div>
 
                     {/* IVF Diet */}
-                    {selectedAppointment.diet && selectedAppointment.diet.length > 0 && (
-                        <div className="detail-section">
-                            <h4>🥗 Dietary Recommendations</h4>
+                    <div className="detail-section">
+                        <h4>🥗 Dietary Recommendations</h4>
+                        {selectedAppointment.diet && selectedAppointment.diet.length > 0 ? (
                             <ul className="detail-list">
                                 {selectedAppointment.diet.map((item, i) => (
                                     <li key={i}>{item}</li>
                                 ))}
                             </ul>
-                        </div>
-                    )}
+                        ) : (
+                            <p style={{fontStyle:'italic', color:'#888'}}>No diet plan found.</p>
+                        )}
+                    </div>
 
                     {/* Pharmacy Table */}
-                    {selectedAppointment.pharmacy && selectedAppointment.pharmacy.length > 0 && (
-                        <div className="detail-section">
-                            <h4>💊 Medications</h4>
+                    <div className="detail-section">
+                        <h4>💊 Medications</h4>
+                        {selectedAppointment.pharmacy && selectedAppointment.pharmacy.length > 0 ? (
                             <table className="med-table">
                                 <thead>
                                     <tr>
@@ -644,16 +659,20 @@ const Appointment = () => {
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
-                    )}
+                        ) : (
+                            <p style={{fontStyle:'italic', color:'#888'}}>No medications prescribed.</p>
+                        )}
+                    </div>
 
                     {/* Notes */}
-                    {selectedAppointment.notes && (
-                        <div className="detail-section">
-                            <h4>📝 Doctor's Notes</h4>
-                            <p className="notes-text">{selectedAppointment.notes}</p>
-                        </div>
-                    )}
+                    <div className="detail-section">
+                         <h4>📝 Doctor's Notes</h4>
+                         {selectedAppointment.notes ? (
+                             <p className="notes-text">{selectedAppointment.notes}</p>
+                         ) : (
+                             <p style={{fontStyle:'italic', color:'#888'}}>No notes provided.</p>
+                         )}
+                    </div>
 
                     {/* Documents / Files */}
                     <div className="detail-section">
@@ -676,6 +695,18 @@ const Appointment = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* --- DEBUG MODE: RAW DATA DUMP --- */}
+                    <div style={{ marginTop: '20px', padding: '10px', background: '#333', color: '#fff', borderRadius: '5px', fontSize: '0.8rem' }}>
+                        <details>
+                            <summary style={{cursor: 'pointer', color: '#4da3ff'}}>🛠️ CLICK HERE TO DEBUG MISSING DATA</summary>
+                            <p style={{marginTop:'5px', color: '#aaa'}}>If your data appears here but not above, the field names in your database (MongoDB) do not match the frontend code.</p>
+                            <pre style={{ overflowX: 'auto', background: '#000', padding: '10px', marginTop: '5px' }}>
+                                {JSON.stringify(selectedAppointment, null, 2)}
+                            </pre>
+                        </details>
+                    </div>
+
                 </div>
             </div>
         </div>
