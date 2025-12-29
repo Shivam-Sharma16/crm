@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
 import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
-import './Patient.css'; // Ensure this is imported
+import './Patient.css'; 
 
 // --- IVF RELATED DATA CONSTANTS ---
 const IVF_LAB_TESTS = [
@@ -78,14 +78,17 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
   }, []);
 
   const toggleOption = (option) => {
+    const currentSelected = selected || []; // Safety check
     let newSelected;
-    if (selected.includes(option)) {
-      newSelected = selected.filter(item => item !== option);
+    if (currentSelected.includes(option)) {
+      newSelected = currentSelected.filter(item => item !== option);
     } else {
-      newSelected = [...selected, option];
+      newSelected = [...currentSelected, option];
     }
     onChange(newSelected);
   };
+
+  const safeSelected = selected || [];
 
   return (
     <div className="multiselect-container" ref={dropdownRef}>
@@ -95,7 +98,7 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
         className={`multiselect-header ${isOpen ? 'open' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span>{selected.length > 0 ? `${selected.length} selected` : 'Select options...'}</span>
+        <span>{safeSelected.length > 0 ? `${safeSelected.length} selected` : 'Select options...'}</span>
         <span className="multiselect-arrow">▼</span>
       </div>
 
@@ -104,12 +107,12 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
           {options.map((option) => (
             <div 
               key={option} 
-              className={`multiselect-item ${selected.includes(option) ? 'selected' : ''}`}
+              className={`multiselect-item ${safeSelected.includes(option) ? 'selected' : ''}`}
               onClick={() => toggleOption(option)}
             >
               <input 
                 type="checkbox" 
-                checked={selected.includes(option)} 
+                checked={safeSelected.includes(option)} 
                 readOnly 
                 className="multiselect-checkbox"
               />
@@ -121,7 +124,7 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
       
       {/* Selected Tags Display */}
       <div className="multiselect-tags">
-        {selected.map(item => (
+        {safeSelected.map(item => (
           <span key={item} className="multiselect-tag">
             {item} 
             <span className="tag-remove" onClick={() => toggleOption(item)}>×</span>
@@ -142,7 +145,7 @@ const DoctorPatientDetails = () => {
   const [preview, setPreview] = useState(null);
 
   // --- React Hook Form ---
-  const { register, control, handleSubmit, setValue, watch, reset, formState: { isSubmitting } } = useForm({
+  const { register, control, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm({
     defaultValues: {
       labTests: [],
       dietPlan: [],
@@ -157,6 +160,7 @@ const DoctorPatientDetails = () => {
     if (appointment) {
       setValue('labTests', appointment.labTests || []);
       setValue('dietPlan', appointment.dietPlan || appointment.diet || []);
+      // Map legacy notes or new prescriptionDescription
       setValue('prescriptionDescription', appointment.prescriptionDescription || appointment.notes || '');
 
       // Map pharmacy data
@@ -167,6 +171,8 @@ const DoctorPatientDetails = () => {
             duration: p.duration || ''
          }));
          setValue('pharmacy', mappedPharmacy);
+      } else {
+        setValue('pharmacy', []);
       }
 
       // Fetch History
@@ -190,12 +196,14 @@ const DoctorPatientDetails = () => {
 
   // Handle Medication Name Selection (Syncs with RHF pharmacy array)
   const handlePharmacySelection = (selectedNames, currentPharmacyValues, onChange) => {
+    const currentValues = currentPharmacyValues || [];
+    
     // 1. Filter out items that were deselected
-    const keptItems = currentPharmacyValues.filter(item => selectedNames.includes(item.medicineName));
+    const keptItems = currentValues.filter(item => selectedNames.includes(item.medicineName));
     
     // 2. Add new items that were selected
     const newItems = selectedNames
-        .filter(name => !currentPharmacyValues.some(item => item.medicineName === name))
+        .filter(name => !currentValues.some(item => item.medicineName === name))
         .map(name => ({ medicineName: name, frequency: '', duration: '' }));
     
     onChange([...keptItems, ...newItems]);
@@ -204,13 +212,14 @@ const DoctorPatientDetails = () => {
   const onSubmit = async (data) => {
     const formData = new FormData();
     // Unified payload
-    formData.append('diagnosis', data.prescriptionDescription); // Map to legacy diagnosis/notes
-    formData.append('prescriptionDescription', data.prescriptionDescription); // Save to new field
+    formData.append('diagnosis', data.prescriptionDescription || ''); 
+    formData.append('prescriptionDescription', data.prescriptionDescription || ''); 
     formData.append('status', 'completed');
 
-    formData.append('labTests', JSON.stringify(data.labTests));
-    formData.append('dietPlan', JSON.stringify(data.dietPlan));
-    formData.append('pharmacy', JSON.stringify(data.pharmacy));
+    // Safe stringify with default empty arrays
+    formData.append('labTests', JSON.stringify(data.labTests || []));
+    formData.append('dietPlan', JSON.stringify(data.dietPlan || []));
+    formData.append('pharmacy', JSON.stringify(data.pharmacy || []));
 
     if (data.prescriptionFile && data.prescriptionFile.length > 0) {
       formData.append('prescriptionFile', data.prescriptionFile[0]);
@@ -237,7 +246,6 @@ const DoctorPatientDetails = () => {
 
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
-  // Documents list helper
   const getPrescriptionsList = () => {
       if (appointment.prescriptions && appointment.prescriptions.length > 0) return appointment.prescriptions;
       if (appointment.prescription) return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
@@ -246,7 +254,6 @@ const DoctorPatientDetails = () => {
   const prescriptionsList = getPrescriptionsList();
   const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
   
-  // Watch pharmacy field for rendering dynamic inputs
   const pharmacyValues = watch('pharmacy') || [];
   const selectedMedNames = pharmacyValues.map(p => p.medicineName);
 
@@ -303,7 +310,7 @@ const DoctorPatientDetails = () => {
                             <MultiSelectDropdown 
                                 title="Lab Tests (IVF)" 
                                 options={IVF_LAB_TESTS} 
-                                selected={field.value} 
+                                selected={field.value || []} 
                                 onChange={field.onChange} 
                             />
                         )}
@@ -319,7 +326,7 @@ const DoctorPatientDetails = () => {
                             <MultiSelectDropdown 
                                 title="Dietary Recommendations" 
                                 options={IVF_DIET_PLAN} 
-                                selected={field.value} 
+                                selected={field.value || []} 
                                 onChange={field.onChange} 
                             />
                         )}
@@ -348,7 +355,6 @@ const DoctorPatientDetails = () => {
                                 <div key={item.medicineName} className="medication-row">
                                     <div className="med-name">{item.medicineName}</div>
                                     
-                                    {/* Register dynamic inputs directly to pharmacy array path */}
                                     <select 
                                         {...register(`pharmacy.${index}.frequency`)}
                                         className="med-input"
