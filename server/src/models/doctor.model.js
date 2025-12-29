@@ -80,6 +80,6 @@ doctorSchema.index({ doctorId: 1 }); // Index for finding by doctorId
 doctorSchema.index({ email: 1 }); // Index for email lookups
 
 const Doctor = mongoose.model('Doctor', doctorSchema);
-//doctor 
+//doctor dda
 module.exports = Doctor;
 
