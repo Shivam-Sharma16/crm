@@ -1,15 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
-import { useAppDispatch, useDoctors, useAppSelector } from '../../store/hooks';
-import { 
-    saveTreatmentPlan, 
-    fetchTreatmentPlan, 
-    fetchPatientHistory, 
-    deletePlanFile,
-    clearCurrentPlan
-} from '../../store/slices/doctorSlice';
-import './Patient.css'; 
+import { useAppDispatch, useDoctors } from '../../store/hooks';
+import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
+import './Patient.css'; // Ensure this is imported
 
 // --- IVF RELATED DATA CONSTANTS ---
 const IVF_LAB_TESTS = [
@@ -84,17 +77,14 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
   }, []);
 
   const toggleOption = (option) => {
-    const currentSelected = selected || []; 
     let newSelected;
-    if (currentSelected.includes(option)) {
-      newSelected = currentSelected.filter(item => item !== option);
+    if (selected.includes(option)) {
+      newSelected = selected.filter(item => item !== option);
     } else {
-      newSelected = [...currentSelected, option];
+      newSelected = [...selected, option];
     }
     onChange(newSelected);
   };
-
-  const safeSelected = selected || [];
 
   return (
     <div className="multiselect-container" ref={dropdownRef}>
@@ -104,7 +94,7 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
         className={`multiselect-header ${isOpen ? 'open' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span>{safeSelected.length > 0 ? `${safeSelected.length} selected` : 'Select options...'}</span>
+        <span>{selected.length > 0 ? `${selected.length} selected` : 'Select options...'}</span>
         <span className="multiselect-arrow">▼</span>
       </div>
 
@@ -113,12 +103,12 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
           {options.map((option) => (
             <div 
               key={option} 
-              className={`multiselect-item ${safeSelected.includes(option) ? 'selected' : ''}`}
+              className={`multiselect-item ${selected.includes(option) ? 'selected' : ''}`}
               onClick={() => toggleOption(option)}
             >
               <input 
                 type="checkbox" 
-                checked={safeSelected.includes(option)} 
+                checked={selected.includes(option)} 
                 readOnly 
                 className="multiselect-checkbox"
               />
@@ -130,7 +120,7 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
       
       {/* Selected Tags Display */}
       <div className="multiselect-tags">
-        {safeSelected.map(item => (
+        {selected.map(item => (
           <span key={item} className="multiselect-tag">
             {item} 
             <span className="tag-remove" onClick={() => toggleOption(item)}>×</span>
@@ -147,124 +137,119 @@ const DoctorPatientDetails = () => {
   const dispatch = useAppDispatch();
   const { appointments, patientHistory } = useDoctors();
   
-  // New selector for the separate plan
-  const { currentTreatmentPlan } = useAppSelector(state => state.doctors);
-  
   const appointment = appointments.find(a => a._id === appointmentId);
+  
+  const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
-  // --- React Hook Form ---
-  const { register, control, handleSubmit, setValue, watch, formState: { isSubmitting } } = useForm({
-    defaultValues: {
-      labTests: [],
-      dietPlan: [],
-      pharmacy: [],
-      prescriptionDescription: '',
-      prescriptionFile: null
-    }
-  });
-
-  // 1. Initial Load: Fetch History & Plan
-  useEffect(() => {
-    if (appointmentId) {
-        dispatch(fetchTreatmentPlan(appointmentId));
-    }
-    // Cleanup on unmount
-    return () => { dispatch(clearCurrentPlan()); };
-  }, [appointmentId, dispatch]);
+  // --- STATES ---
+  const [selectedLabs, setSelectedLabs] = useState([]);
+  const [selectedDiet, setSelectedDiet] = useState([]);
+  
+  // Pharmacy
+  const [selectedMedNames, setSelectedMedNames] = useState([]); 
+  const [pharmacyDetails, setPharmacyDetails] = useState([]);
 
   useEffect(() => {
     if (appointment) {
-        const pId = appointment.patientId || appointment.userId?._id;
-        if (pId) dispatch(fetchPatientHistory(pId));
+      setNotes(appointment.notes || '');
+      if (appointment.labTests) setSelectedLabs(appointment.labTests);
+      if (appointment.dietPlan || appointment.diet) setSelectedDiet(appointment.dietPlan || appointment.diet);
+      if (appointment.pharmacy) {
+        // Map backend structure (medicineName) to frontend structure (name)
+        const mappedPharmacy = appointment.pharmacy.map(p => ({
+            name: p.medicineName || p.name,
+            frequency: p.frequency || '',
+            duration: p.duration || ''
+        }));
+        setPharmacyDetails(mappedPharmacy);
+        setSelectedMedNames(mappedPharmacy.map(p => p.name));
+      }
+
+      // Fetch History if we have a patientId (or userId)
+      const pId = appointment.patientId || appointment.userId?._id;
+      if (pId) {
+          dispatch(fetchPatientHistory(pId));
+      }
     }
   }, [appointment, dispatch]);
 
-  // 2. Populate Form when currentTreatmentPlan arrives
-  useEffect(() => {
-    if (currentTreatmentPlan) {
-        setValue('labTests', currentTreatmentPlan.labTests || []);
-        setValue('dietPlan', currentTreatmentPlan.dietPlan || []);
-        setValue('prescriptionDescription', currentTreatmentPlan.prescriptionDescription || currentTreatmentPlan.diagnosis || '');
-        
-        // Map pharmacy if exists
-        if (currentTreatmentPlan.pharmacy && currentTreatmentPlan.pharmacy.length > 0) {
-            setValue('pharmacy', currentTreatmentPlan.pharmacy);
-        } else {
-            setValue('pharmacy', []);
-        }
-    }
-  }, [currentTreatmentPlan, setValue]);
+  const handleMedNameChange = (newNames) => {
+    setSelectedMedNames(newNames);
+    
+    // Sync detailed array with names
+    setPharmacyDetails(prev => {
+      // Keep existing details if name is still selected
+      const updated = newNames.map(name => {
+        const existing = prev.find(p => p.name === name);
+        return existing || { name, frequency: '', duration: '' };
+      });
+      return updated;
+    });
+  };
 
-  // Handle File Preview
+  const handlePharmacyDetailChange = (index, field, value) => {
+    const updated = [...pharmacyDetails];
+    updated[index] = { ...updated[index], [field]: value };
+    setPharmacyDetails(updated);
+  };
+
   const handleFileChange = (e) => {
-      const selectedFile = e.target.files[0];
-      if (selectedFile) {
-          const objectUrl = URL.createObjectURL(selectedFile);
-          setPreview(objectUrl);
-      } else {
-          setPreview(null);
-      }
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setPreview(objectUrl);
+    }
   };
 
-  // Handle Medication Name Selection (Syncs with RHF pharmacy array)
-  const handlePharmacySelection = (selectedNames, currentPharmacyValues, onChange) => {
-    const currentValues = currentPharmacyValues || [];
-    
-    // 1. Filter out items that were deselected
-    const keptItems = currentValues.filter(item => selectedNames.includes(item.medicineName));
-    
-    // 2. Add new items that were selected
-    const newItems = selectedNames
-        .filter(name => !currentValues.some(item => item.medicineName === name))
-        .map(name => ({ medicineName: name, frequency: '', duration: '' }));
-    
-    onChange([...keptItems, ...newItems]);
-  };
-
-  const onSubmit = async (data) => {
+  const handleSave = async () => {
+    setIsUploading(true);
     const formData = new FormData();
-    // Unified payload structure for Treatment Plan
-    formData.append('diagnosis', data.prescriptionDescription || ''); 
-    formData.append('prescriptionDescription', data.prescriptionDescription || ''); 
+    if (file) formData.append('prescriptionFile', file);
+    formData.append('diagnosis', notes);
     formData.append('status', 'completed');
 
-    // JSON Stringify complex arrays
-    formData.append('labTests', JSON.stringify(data.labTests || []));
-    formData.append('dietPlan', JSON.stringify(data.dietPlan || []));
-    formData.append('pharmacy', JSON.stringify(data.pharmacy || []));
-
-    if (data.prescriptionFile && data.prescriptionFile.length > 0) {
-      formData.append('prescriptionFile', data.prescriptionFile[0]);
-    }
+    // Append JSON strings for complex arrays
+    formData.append('labTests', JSON.stringify(selectedLabs));
+    formData.append('dietPlan', JSON.stringify(selectedDiet));
+    formData.append('pharmacy', JSON.stringify(pharmacyDetails));
 
     try {
-      // Using the NEW saveTreatmentPlan action
-      await dispatch(saveTreatmentPlan({ appointmentId, formData })).unwrap();
-      alert('Treatment plan saved successfully!');
+      await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
+      alert('Treatment plan updated successfully!');
+      setFile(null);
       setPreview(null);
     } catch (err) {
-      console.error(err);
-      alert('Failed to save plan: ' + err);
+      alert('Failed to update: ' + err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  const handleRemoveFile = async (fileId) => {
-      if(!window.confirm("Are you sure you want to remove this file?")) return;
+  const handleDeletePrescription = async (prescriptionId) => {
+      if(!window.confirm("Are you sure you want to delete this prescription?")) return;
       try {
-          await dispatch(deletePlanFile({ appointmentId, fileId })).unwrap();
-          alert("File removed.");
+          await dispatch(deletePrescription({ appointmentId, prescriptionId })).unwrap();
+          alert("Prescription removed.");
       } catch (err) {
-          alert("Failed to remove file: " + err);
+          alert("Failed to remove: " + err);
       }
   };
 
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
-  // Use attachments from the separate plan if available
-  const attachments = currentTreatmentPlan?.attachments || [];
-  const pharmacyValues = watch('pharmacy') || [];
-  const selectedMedNames = pharmacyValues.map(p => p.medicineName);
+  const getPrescriptionsList = () => {
+      if (appointment.prescriptions && appointment.prescriptions.length > 0) return appointment.prescriptions;
+      if (appointment.prescription) return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
+      return [];
+  };
+
+  const prescriptionsList = getPrescriptionsList();
+  
+  // Get patient identifier string
   const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
 
   return (
@@ -282,7 +267,6 @@ const DoctorPatientDetails = () => {
                 <div><strong>Patient:</strong> {appointment.userId?.name}</div>
                 <div><strong>Service:</strong> {appointment.serviceName}</div>
                 <div><strong>Date:</strong> {new Date(appointment.appointmentDate).toDateString()}</div>
-                <div className="status-tag">Status: {appointment.status}</div>
             </div>
 
             <hr className="divider" />
@@ -296,158 +280,131 @@ const DoctorPatientDetails = () => {
                             <div key={idx} className="history-item">
                                 <div className="history-date">{new Date(hist.appointmentDate).toLocaleDateString()}</div>
                                 <div className="history-service">{hist.serviceName}</div>
-                                <div className="history-notes">
-                                    {hist.prescriptionDescription || hist.notes || 'No notes'}
-                                </div>
+                                <div className="history-status">{hist.status}</div>
+                                <div className="history-notes">{hist.notes || 'No notes'}</div>
                             </div>
                         ))}
+                        {patientHistory.filter(h => h._id !== appointment._id).length === 0 && (
+                            <p className="no-history">No previous visits recorded.</p>
+                        )}
                     </div>
                 </div>
             )}
 
             <hr className="divider" />
 
-            {/* --- UNIFIED TREATMENT FORM --- */}
-            <form onSubmit={handleSubmit(onSubmit)}>
-                <h3>Treatment Plan</h3>
-                
-                {/* Lab Tests */}
-                <div className="form-group-row">
-                    <Controller
-                        name="labTests"
-                        control={control}
-                        render={({ field }) => (
-                            <MultiSelectDropdown 
-                                title="Lab Tests (IVF)" 
-                                options={IVF_LAB_TESTS} 
-                                selected={field.value || []} 
-                                onChange={field.onChange} 
-                            />
-                        )}
-                    />
-                </div>
+            {/* --- TREATMENT PLAN --- */}
+            <h3>Treatment Plan</h3>
+            
+            <div className="form-group-row">
+                <MultiSelectDropdown 
+                    title="Lab Tests (IVF)" 
+                    options={IVF_LAB_TESTS} 
+                    selected={selectedLabs} 
+                    onChange={setSelectedLabs} 
+                />
+            </div>
 
-                {/* Diet Plan */}
-                <div className="form-group-row">
-                    <Controller
-                        name="dietPlan"
-                        control={control}
-                        render={({ field }) => (
-                            <MultiSelectDropdown 
-                                title="Dietary Recommendations" 
-                                options={IVF_DIET_PLAN} 
-                                selected={field.value || []} 
-                                onChange={field.onChange} 
-                            />
-                        )}
-                    />
-                </div>
+            <div className="form-group-row">
+                <MultiSelectDropdown 
+                    title="Dietary Recommendations" 
+                    options={IVF_DIET_PLAN} 
+                    selected={selectedDiet} 
+                    onChange={setSelectedDiet} 
+                />
+            </div>
 
-                {/* Pharmacy & Medications */}
-                <div className="form-group-row">
-                    <Controller
-                        name="pharmacy"
-                        control={control}
-                        render={({ field }) => (
-                            <MultiSelectDropdown 
-                                title="Pharmacy & Medications" 
-                                options={IVF_MEDICATIONS} 
-                                selected={selectedMedNames} 
-                                onChange={(newNames) => handlePharmacySelection(newNames, field.value, field.onChange)} 
-                            />
-                        )}
-                    />
+            <div className="form-group-row">
+                <MultiSelectDropdown 
+                    title="Pharmacy & Medications" 
+                    options={IVF_MEDICATIONS} 
+                    selected={selectedMedNames} 
+                    onChange={handleMedNameChange} 
+                />
 
-                    {pharmacyValues.length > 0 && (
-                        <div className="pharmacy-details-box">
-                            <h4>Medication Details</h4>
-                            {pharmacyValues.map((item, index) => (
-                                <div key={item.medicineName} className="medication-row">
-                                    <div className="med-name">{item.medicineName}</div>
-                                    
-                                    <select 
-                                        {...register(`pharmacy.${index}.frequency`)}
-                                        className="med-input"
-                                    >
-                                        <option value="">Select Frequency</option>
-                                        {FREQUENCY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+                {pharmacyDetails.length > 0 && (
+                    <div className="pharmacy-details-box">
+                        <h4>Medication Details</h4>
+                        {pharmacyDetails.map((med, index) => (
+                            <div key={index} className="medication-row">
+                                <div className="med-name">{med.name}</div>
+                                
+                                <select 
+                                    value={med.frequency}
+                                    onChange={(e) => handlePharmacyDetailChange(index, 'frequency', e.target.value)}
+                                    className="med-input"
+                                >
+                                    <option value="">Select Frequency</option>
+                                    {FREQUENCY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
 
-                                    <input 
-                                        type="text" 
-                                        placeholder="Duration (e.g. 5 days)" 
-                                        {...register(`pharmacy.${index}.duration`)}
-                                        className="med-input"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                
-                <hr className="divider" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Duration (e.g. 5 days)" 
+                                    value={med.duration}
+                                    onChange={(e) => handlePharmacyDetailChange(index, 'duration', e.target.value)}
+                                    className="med-input"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            
+            <hr className="divider" />
 
-                {/* --- DOCUMENTS & NOTES --- */}
-                <div className="prescriptions-section">
-                    <h3>Uploaded Documents / Files</h3>
-                    {attachments.length === 0 ? (
-                        <p className="no-docs-text">No files uploaded yet.</p>
-                    ) : (
-                        <div className="prescriptions-list">
-                            {attachments.map((item, index) => (
-                                <div key={item._id || index} className="prescription-item">
-                                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
-                                        <div className="doc-icon">📄</div>
-                                        <div className="doc-name">{item.name || 'Document'}</div>
-                                    </a>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => handleRemoveFile(item._id)} 
-                                        className="doc-remove-btn"
-                                    >
+            {/* Documents Section */}
+            <div className="prescriptions-section">
+                <h3>Uploaded Documents</h3>
+                {prescriptionsList.length === 0 ? (
+                    <p className="no-docs-text">No documents uploaded yet.</p>
+                ) : (
+                    <div className="prescriptions-list">
+                        {prescriptionsList.map((item, index) => (
+                            <div key={item._id || index} className="prescription-item">
+                                <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
+                                    <div className="doc-icon">📄</div>
+                                    <div className="doc-name">{item.name || 'Document'}</div>
+                                </a>
+                                {item._id !== 'legacy' && (
+                                    <button onClick={() => handleDeletePrescription(item._id)} className="doc-remove-btn">
                                         Remove
                                     </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <h3 className="section-title">Add File & Notes</h3>
-                <div className="form-group">
-                    <input 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        {...register('prescriptionFile', {
-                            onChange: handleFileChange
-                        })}
-                        className="file-input" 
-                    />
-                </div>
-
-                {preview && !watch('prescriptionFile')?.[0]?.type?.includes('pdf') && (
-                  <div className="preview-container">
-                    <img src={preview} alt="Preview" />
-                  </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
                 )}
+            </div>
 
-                <div className="form-group">
-                    <textarea 
-                        rows="4"
-                        className="notes-input"
-                        {...register('prescriptionDescription')}
-                        placeholder="Prescription / Diagnosis notes..."
-                    />
-                </div>
+            <h3 className="section-title">Add File / Notes</h3>
+            <div className="form-group">
+                <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="file-input" />
+            </div>
 
-                <button 
-                  type="submit"
-                  className="auth-button save-btn"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Saving & Uploading...' : 'Save & Upload'}
-                </button>
-            </form>
+            {preview && file && !file.type.includes('pdf') && (
+              <div className="preview-container">
+                <img src={preview} alt="Preview" />
+              </div>
+            )}
+
+            <div className="form-group">
+                <textarea 
+                    rows="4"
+                    className="notes-input"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="General diagnosis notes..."
+                />
+            </div>
+
+            <button 
+              onClick={handleSave} 
+              className="auth-button save-btn"
+              disabled={isUploading}
+            >
+              {isUploading ? 'Saving...' : 'Save Treatment Plan'}
+            </button>
         </div>
       </div>
     </div>

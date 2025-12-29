@@ -1,7 +1,8 @@
+// client/src/store/slices/doctorSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/api';
 
-// Fetch Doctor Appointments
+// Fetch Appointments
 export const fetchDoctorAppointments = createAsyncThunk(
   'doctors/fetchAppointments',
   async (_, { rejectWithValue }) => {
@@ -10,7 +11,7 @@ export const fetchDoctorAppointments = createAsyncThunk(
       if (response.data.success) return response.data.appointments || [];
       return rejectWithValue(response.data.message);
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch appointments');
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch');
     }
   }
 );
@@ -57,70 +58,41 @@ export const updateAvailability = createAsyncThunk(
   }
 );
 
-// --- NEW: Fetch Treatment Plan ---
-export const fetchTreatmentPlan = createAsyncThunk(
-  'doctors/fetchTreatmentPlan',
-  async (appointmentId, { rejectWithValue }) => {
-    try {
-      const response = await apiClient.get(`/api/treatment-plans/${appointmentId}`);
-      // Returns { success: true, plan: { ... } or null }
-      return response.data.plan;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch plan');
-    }
-  }
-);
-
-// --- NEW: Save Treatment Plan ---
-export const saveTreatmentPlan = createAsyncThunk(
-  'doctors/saveTreatmentPlan',
-  async ({ appointmentId, formData }, { rejectWithValue }) => {
-    try {
-      // Content-Type undefined lets browser set boundary for FormData
-      const config = { headers: { 'Content-Type': undefined } };
-      const response = await apiClient.post(`/api/treatment-plans/${appointmentId}`, formData, config);
-      if (response.data.success) return response.data.plan;
-      return rejectWithValue(response.data.message);
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to save plan');
-    }
-  }
-);
-
-// --- NEW: Delete File from Plan ---
-export const deletePlanFile = createAsyncThunk(
-    'doctors/deletePlanFile',
-    async ({ appointmentId, fileId }, { rejectWithValue }) => {
-        try {
-            const response = await apiClient.delete(`/api/treatment-plans/${appointmentId}/files/${fileId}`);
-            if (response.data.success) return response.data.plan;
-            return rejectWithValue(response.data.message);
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to delete file');
-        }
-    }
-);
-
-// Legacy Action: Update Prescription (Keep for backward compatibility)
+// Update Prescription (Upload) - WITH DEBUG LOGS
 export const updatePrescription = createAsyncThunk(
   'doctors/updatePrescription',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
     try {
-      const config = { headers: { 'Content-Type': undefined } };
+      // --- DEBUG LOG START ---
+      console.log("--- Doctor Slice: Sending FormData ---");
+      for (let [key, value] of formData.entries()) {
+          console.log(`${key}:`, value);
+      }
+      // ---------------------
+
+      // Content-Type: undefined allows the browser to automatically set the boundary
+      const config = {
+        headers: {
+          'Content-Type': undefined 
+        }
+      };
+
       const response = await apiClient.patch(
           `/api/doctor/appointments/${appointmentId}/prescription`, 
           formData,
           config
       );
+      
       if (response.data.success) return response.data.appointment;
       return rejectWithValue(response.data.message);
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update');
+      console.error("Prescription Upload Error:", error);
+      return rejectWithValue(error.response?.data?.message || 'Failed to update prescription');
     }
   }
 );
 
-// Legacy Action: Delete Prescription
+// Delete Prescription
 export const deletePrescription = createAsyncThunk(
     'doctors/deletePrescription',
     async ({ appointmentId, prescriptionId }, { rejectWithValue }) => {
@@ -131,7 +103,7 @@ export const deletePrescription = createAsyncThunk(
             if (response.data.success) return response.data.appointment;
             return rejectWithValue(response.data.message);
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to delete');
+            return rejectWithValue(error.response?.data?.message || 'Failed to delete prescription');
         }
     }
 );
@@ -141,15 +113,13 @@ const doctorSlice = createSlice({
   initialState: {
     appointments: [],
     patientHistory: [],
-    currentTreatmentPlan: null, // Stores the active treatment plan
     loading: false,
     error: null,
   },
   reducers: {
     clearAppointments: (state) => { state.appointments = []; },
     clearError: (state) => { state.error = null; },
-    clearHistory: (state) => { state.patientHistory = []; },
-    clearCurrentPlan: (state) => { state.currentTreatmentPlan = null; }
+    clearHistory: (state) => { state.patientHistory = []; }
   },
   extraReducers: (builder) => {
     builder
@@ -188,48 +158,23 @@ const doctorSlice = createSlice({
         }
       })
 
-      // --- Treatment Plan Handlers ---
-      .addCase(fetchTreatmentPlan.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchTreatmentPlan.fulfilled, (state, action) => {
-        state.loading = false;
-        state.currentTreatmentPlan = action.payload; // Set the plan data
-      })
-      .addCase(fetchTreatmentPlan.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-      .addCase(saveTreatmentPlan.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(saveTreatmentPlan.fulfilled, (state, action) => {
-        state.loading = false;
-        state.currentTreatmentPlan = action.payload; // Update with saved plan
-        state.error = null;
-      })
-      .addCase(saveTreatmentPlan.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-      .addCase(deletePlanFile.fulfilled, (state, action) => {
-        state.currentTreatmentPlan = action.payload; // Update with plan after file deletion
-      })
-
-      // Legacy Handlers
+      // Update Prescription
       .addCase(updatePrescription.fulfilled, (state, action) => {
         const index = state.appointments.findIndex(app => app._id === action.payload._id);
-        if (index !== -1) state.appointments[index] = action.payload;
+        if (index !== -1) {
+          state.appointments[index] = action.payload;
+        }
       })
+      
+      // Delete Prescription
       .addCase(deletePrescription.fulfilled, (state, action) => {
         const index = state.appointments.findIndex(app => app._id === action.payload._id);
-        if (index !== -1) state.appointments[index] = action.payload;
+        if (index !== -1) {
+          state.appointments[index] = action.payload;
+        }
       });
   },
 });
 
-export const { clearAppointments, clearError, clearHistory, clearCurrentPlan } = doctorSlice.actions;
+export const { clearAppointments, clearError, clearHistory } = doctorSlice.actions;
 export default doctorSlice.reducer;

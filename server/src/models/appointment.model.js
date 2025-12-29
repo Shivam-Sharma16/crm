@@ -1,5 +1,23 @@
-// server/src/models/appointment.model.js
 const mongoose = require('mongoose');
+
+// Define a sub-schema for Pharmacy items to ensure structure
+const pharmacyItemSchema = new mongoose.Schema({
+  medicineName: { 
+    type: String, 
+    required: [true, 'Medicine name is required'],
+    trim: true
+  },
+  frequency: { 
+    type: String, 
+    default: '',
+    trim: true
+  }, // e.g., "2 times a day"
+  duration: { 
+    type: String, 
+    default: '',
+    trim: true
+  }   // e.g., "5 days"
+}, { _id: false });
 
 const appointmentSchema = new mongoose.Schema({
   userId: {
@@ -58,40 +76,60 @@ const appointmentSchema = new mongoose.Schema({
     default: 0
   },
   
-  // --- CLINICAL DATA & NOTES ---
-  // Note: Detailed clinical data (Pharmacy, Lab, Diet, Files) 
-  // has moved to the 'TreatmentPlan' model.
+  // --- FIELDS THAT WERE PREVIOUSLY MISSING OR NOT SAVING ---
   
-  // 1. General Notes (Used during booking or for basic instructions)
+  // 1. General Notes
   notes: {
     type: String,
     default: '' 
   },
   
-  // 2. Doctor's Private Notes (Optional, separate from shared treatment plan)
+  // 2. Clinical Data
   doctorNotes: {
     type: String,
     default: ''
   },
-
-  // 3. Symptoms (Provided by patient during booking)
   symptoms: {
     type: String,
     default: ''
   },
-
-  // 4. Legacy / Simple Diagnosis Support 
-  // (Detailed diagnosis is now in TreatmentPlan, but we keep this for list views if needed)
   diagnosis: {
     type: String,
     default: ''
   },
 
-  // 5. IVF Specific Data (Booking related details)
+  // 3. Treatment Plans (Arrays)
+  labTests: [{
+    type: String,
+    trim: true
+  }],
+
+  dietPlan: [{
+    type: String,
+    trim: true
+  }],
+
+  pharmacy: [pharmacyItemSchema], // Maps to 'medicines' in frontend
+
+  // 4. IVF Specific Data (Flexible Object)
   ivfDetails: {
-    type: mongoose.Schema.Types.Mixed, 
+    type: mongoose.Schema.Types.Mixed, // Allows generic object structure
     default: {}
-  }
+  },
+  // -------------------------------------
+
+  // Legacy single prescription file
+  prescription: {
+    type: String,
+    default: ''
+  },
+  // Modern multiple prescription files support
+  prescriptions: [{
+    url: { type: String, required: true },
+    fileId: { type: String },
+    name: { type: String },
+    uploadedAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });

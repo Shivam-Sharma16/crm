@@ -82,8 +82,7 @@ router.get('/appointments', verifyToken, async (req, res) => {
     const doctorUserId = req.user.id || req.user.userId;
     
     const appointments = await Appointment.find({ doctorUserId })
-      // Explicitly selecting prescriptionDescription and other new fields
-      .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes prescriptionDescription prescription prescriptions labTests dietPlan pharmacy')
+      .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes prescription prescriptions labTests dietPlan pharmacy')
       .populate('userId', 'name email phone patientId')
       .sort({ appointmentDate: 1, appointmentTime: 1 })
       .lean();
@@ -136,24 +135,25 @@ router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
 // UPLOAD Prescription & Update Treatment Details (FIXED WITH LOGS)
 router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
   try {
-    const { status, diagnosis, prescriptionDescription, labTests, diet, dietPlan, pharmacy } = req.body;
-    const appointmentId = req.params.id;
-    
-    // --- DEBUG LOGS: Check your server console when you click save ---
-    console.log(`[DOCTOR] Updating ID: ${appointmentId}`);
-    console.log(`[DOCTOR] Diagnosis/Notes: ${diagnosis}`);
-    console.log(`[DOCTOR] PrescriptionDescription: ${prescriptionDescription}`);
-    console.log(`[DOCTOR] Pharmacy Raw: ${pharmacy}`);
-    // -------------------------------------------------------------
+    // --- DEBUG LOG START ---
+    console.log(`[DOCTOR] Updating Prescription for ID: ${req.params.id}`);
+    console.log(`[DOCTOR] Req Body Keys:`, Object.keys(req.body));
+    // Check raw values to see if they are arriving
+    console.log(`[DOCTOR] Raw LabTests:`, req.body.labTests);
+    console.log(`[DOCTOR] Raw DietPlan:`, req.body.dietPlan);
+    console.log(`[DOCTOR] Raw Pharmacy:`, req.body.pharmacy);
+    // ---------------------
 
     if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
 
+    const { status, diagnosis, labTests, diet, dietPlan, pharmacy } = req.body;
+    const appointmentId = req.params.id;
     const doctorUserId = req.user.id || req.user.userId;
+
     const appointment = await Appointment.findOne({ _id: appointmentId, doctorUserId });
-    
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
-    // 1. Handle File Upload
+    // Handle File Upload
     if (req.file) {
         console.log(`[DOCTOR] File uploaded: ${req.file.originalname}`);
         const result = await imagekit.upload({
@@ -166,7 +166,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
 
         if (!appointment.prescriptions) appointment.prescriptions = [];
 
-        // Legacy migration
+        // Migrate legacy
         if (appointment.prescription && appointment.prescriptions.length === 0) {
              appointment.prescriptions.push({
                  url: appointment.prescription,
@@ -181,58 +181,53 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
             name: req.file.originalname,
             uploadedAt: new Date()
         });
+        
         appointment.prescription = result.url;
     }
 
-    // 2. Update Simple Fields (Check for undefined to allow empty strings/clearing)
-    if (status !== undefined) appointment.status = status;
-    
-    // Save to 'notes' (Legacy/History view)
-    if (diagnosis !== undefined) appointment.notes = diagnosis; 
-    
-    // Save to 'prescriptionDescription' (New Field)
-    if (prescriptionDescription !== undefined) {
-        appointment.prescriptionDescription = prescriptionDescription;
-    } else if (diagnosis !== undefined) {
-        // Fallback: if description isn't sent but diagnosis is, sync them
-        appointment.prescriptionDescription = diagnosis;
-    }
+    // Update Status & Notes
+    if (status) appointment.status = status;
+    if (diagnosis) appointment.notes = diagnosis; 
 
-    // 3. Parse Complex Fields
+    // --- FIX: Robust Parsing for Complex Fields ---
     
-    // Lab Tests
+    // 1. Lab Tests
     if (labTests) {
       try {
+        // If it's already an array (unlikely with FormData), use it. If string, parse it.
         const parsed = typeof labTests === 'string' ? JSON.parse(labTests) : labTests;
         appointment.labTests = Array.isArray(parsed) ? parsed : [];
+        console.log(`[DOCTOR] Parsed LabTests:`, appointment.labTests);
       } catch (e) { console.error("[DOCTOR] Error parsing labTests:", e); }
     }
 
-    // Diet Plan
+    // 2. Diet Plan
     const dietData = dietPlan || diet;
     if (dietData) {
       try {
         const parsed = typeof dietData === 'string' ? JSON.parse(dietData) : dietData;
         appointment.dietPlan = Array.isArray(parsed) ? parsed : [];
+        console.log(`[DOCTOR] Parsed DietPlan:`, appointment.dietPlan);
       } catch (e) { console.error("[DOCTOR] Error parsing dietPlan:", e); }
     }
 
-    // Pharmacy
+    // 3. Pharmacy
     if (pharmacy) {
       try {
         const parsedPharmacy = typeof pharmacy === 'string' ? JSON.parse(pharmacy) : pharmacy;
         if (Array.isArray(parsedPharmacy)) {
             appointment.pharmacy = parsedPharmacy.map(item => ({
-                medicineName: item.medicineName || item.name, 
+                medicineName: item.name || item.medicineName, // Map frontend 'name' to backend 'medicineName'
                 frequency: item.frequency || '',
                 duration: item.duration || ''
             }));
+            console.log(`[DOCTOR] Parsed Pharmacy (${appointment.pharmacy.length} items)`);
         }
       } catch (e) { console.error("[DOCTOR] Error parsing pharmacy:", e); }
     }
 
     const savedDoc = await appointment.save();
-    console.log(`[DOCTOR] Save Successful for ${savedDoc._id}`);
+    console.log(`[DOCTOR] Save Successful. Updated Fields:`, Object.keys(savedDoc.toObject()));
     
     res.json({ success: true, message: 'Treatment plan updated', appointment: savedDoc });
   } catch (error) {
@@ -331,7 +326,7 @@ router.get('/patients/:patientId/history', verifyToken, async (req, res) => {
 
         const history = await Appointment.find(query)
             .sort({ appointmentDate: -1 })
-            .select('appointmentDate appointmentTime serviceName status notes prescriptionDescription prescription prescriptions labTests dietPlan pharmacy')
+            .select('appointmentDate appointmentTime serviceName status notes prescription prescriptions labTests dietPlan pharmacy')
             .lean();
 
         res.json({ success: true, history });
