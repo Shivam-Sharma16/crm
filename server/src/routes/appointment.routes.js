@@ -1,34 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const Appointment = require('../models/appointment.model');
 const Doctor = require('../models/doctor.model');
 const User = require('../models/user.model'); 
 const { verifyToken } = require('../middleware/auth.middleware');
-const imagekit = require('../utils/imagekit');
-
-// Configure Multer for File Uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-});
 
 // --- 1. Create Appointment ---
 router.post('/create', verifyToken, async (req, res) => {
   try {
+    // [DEBUG] Log Incoming Data
+    console.log("------------------------------------------");
+    console.log("[BACKEND] Incoming Create Request Body:", JSON.stringify(req.body, null, 2));
+    
+    // [FIX] Destructure ALL fields, including the new ones for IVF/Doctor details
     const { 
       doctorId, serviceId, serviceName, appointmentDate, appointmentTime, amount, 
-      notes, symptoms, ivfDetails
+      notes, doctorNotes, symptoms, diagnosis, ivfDetails, pharmacy, labTests, dietPlan 
     } = req.body;
 
     const userId = req.user.userId;
 
     if (!doctorId || !appointmentDate || !appointmentTime) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
+      return res.status(400).json({ success: false, message: 'Missing required fields (doctorId, date, or time)' });
     }
 
+    // Fetch User to get persistent Patient ID
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
     const patientId = user.patientId; 
 
     // Find Doctor
@@ -40,178 +40,139 @@ router.post('/create', verifyToken, async (req, res) => {
       ]
     });
 
-    if (!doctorDoc) return res.status(400).json({ success: false, message: 'Doctor not found.' });
+    if (!doctorDoc) {
+      return res.status(400).json({ success: false, message: 'Doctor not found.' });
+    }
 
-    // Validate Date (Simplified for brevity, keep your existing validation logic if preferred)
+    // Validate Date
+    const today = new Date();
     const reqDate = new Date(appointmentDate);
-    if (isNaN(reqDate.getTime())) return res.status(400).json({message: "Invalid Date"});
+    const todayStr = today.toISOString().split('T')[0];
+    const reqDateStr = reqDate.toISOString().split('T')[0];
 
-    // Check Double Booking
-    const existing = await Appointment.findOne({
+    if (reqDateStr < todayStr) {
+        return res.status(400).json({ success: false, message: 'Cannot book appointments in the past.' });
+    }
+
+    // Validate Time (Simple logic)
+    if (reqDateStr === todayStr) {
+        const currentHours = today.getHours();
+        const currentMinutes = today.getMinutes();
+        const currentTimeInMin = currentHours * 60 + currentMinutes;
+        const [reqHours, reqMinutes] = appointmentTime.split(':').map(Number);
+        const reqTimeInMin = reqHours * 60 + reqMinutes;
+
+        if (reqTimeInMin <= currentTimeInMin + 15) {
+             return res.status(400).json({ success: false, message: 'This time slot is too soon or has passed.' });
+        }
+    }
+
+    // Check Availability
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = days[reqDate.getDay()];
+    
+    if (doctorDoc.availability && doctorDoc.availability[dayName]) {
+        const daySchedule = doctorDoc.availability[dayName];
+        if (!daySchedule.available) {
+            return res.status(400).json({ success: false, message: `Doctor is not available on ${dayName}s.` });
+        }
+        if (daySchedule.startTime && daySchedule.endTime) {
+            const getMin = (t) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]);
+            const reqMin = getMin(appointmentTime);
+            const startMin = getMin(daySchedule.startTime);
+            const endMin = getMin(daySchedule.endTime);
+            
+            if (reqMin < startMin || reqMin >= endMin) {
+                 return res.status(400).json({ success: false, message: `Doctor is only available between ${daySchedule.startTime} and ${daySchedule.endTime}` });
+            }
+        }
+    }
+
+    // Check for Double Booking
+    const existingAppointment = await Appointment.findOne({
         doctorId: doctorDoc._id,
-        appointmentDate: reqDate,
+        appointmentDate: new Date(reqDateStr),
         appointmentTime: appointmentTime,
         status: { $ne: 'cancelled' }
     });
-    if (existing) return res.status(400).json({ success: false, message: 'Slot already booked.' });
 
+    if (existingAppointment) {
+        return res.status(400).json({ success: false, message: 'This slot is already booked.' });
+    }
+
+    // [FIX] Save Appointment with ALL FIELDS
     const appointment = new Appointment({
       userId: userId,
       patientId: patientId, 
       doctorId: doctorDoc._id,
       doctorUserId: doctorDoc.userId,
       doctorName: doctorDoc.name,
-      serviceId: serviceId || 'general',
+      serviceId: serviceId || (doctorDoc.services && doctorDoc.services[0]) || 'general',
       serviceName: serviceName || 'General Consultation',
-      appointmentDate: reqDate,
+      appointmentDate: new Date(reqDateStr),
       appointmentTime: appointmentTime,
       amount: amount || doctorDoc.consultationFee || 500,
+      
+      // Explicitly passing the new data (previously these were missing)
       notes: notes || '',
+      doctorNotes: doctorNotes || '', 
       symptoms: symptoms || '',
+      diagnosis: diagnosis || '',
       ivfDetails: ivfDetails || {}, 
+      pharmacy: pharmacy || [],
+      labTests: labTests || [],
+      dietPlan: dietPlan || [],
+
       status: 'pending',
       paymentStatus: 'pending'
     });
 
     const savedAppointment = await appointment.save();
-    res.status(201).json({ success: true, message: 'Appointment booked', appointment: savedAppointment });
+    
+    console.log("[BACKEND] Appointment Created & Saved. ID:", savedAppointment._id);
+    console.log("------------------------------------------");
+
+    res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment: savedAppointment });
 
   } catch (error) {
-    console.error('Create error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    console.error('Create appointment error:', error);
+    res.status(500).json({ success: false, message: 'Server error creating appointment', error: error.message });
   }
 });
 
-// --- 2. Update Treatment Plan (Doctor Action) ---
-router.put('/update-plan/:id', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
-    try {
-        const appointmentId = req.params.id;
-        console.log(`[BACKEND] Updating Plan for ID: ${appointmentId}`);
-        console.log(`[BACKEND] Body Keys:`, Object.keys(req.body));
-
-        const appointment = await Appointment.findById(appointmentId);
-        if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
-
-        // Check if the appointment belongs to the logged-in doctor
-        if (appointment.doctorUserId.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Access denied. You can only update your own appointments.' });
-        }
-
-        // 1. File Upload Logic
-        if (req.file) {
-            console.log(`[BACKEND] Uploading file: ${req.file.originalname}`);
-            const result = await imagekit.upload({
-                file: req.file.buffer,
-                fileName: `rx_${appointmentId}_${Date.now()}`,
-                folder: '/crm',
-                tags: ['prescription', appointmentId]
-            });
-            
-            if (!appointment.prescriptions) appointment.prescriptions = [];
-            appointment.prescriptions.push({
-                url: result.url,
-                fileId: result.fileId,
-                name: req.file.originalname
-            });
-            appointment.prescription = result.url; // Legacy support
-        }
-
-        // 2. Parse Data (FormData sends everything as strings)
-        const { diagnosis, instructions, labTests, dietPlan, pharmacy, status } = req.body;
-
-        // Initialize treatmentPlan if missing
-        if (!appointment.treatmentPlan) appointment.treatmentPlan = {};
-
-        // Helper to parse JSON strings
-        const parseJSON = (data, name) => {
-            if (!data) return [];
-            try {
-                return typeof data === 'string' ? JSON.parse(data) : data;
-            } catch (e) {
-                console.error(`Error parsing ${name}:`, e.message);
-                return [];
-            }
-        };
-
-        // Update Fields
-        if (diagnosis) appointment.treatmentPlan.diagnosis = diagnosis;
-        if (instructions) appointment.treatmentPlan.instructions = instructions;
-        if (status) appointment.status = status;
-
-        if (labTests) appointment.treatmentPlan.labTests = parseJSON(labTests, 'labTests');
-        if (dietPlan) appointment.treatmentPlan.dietPlan = parseJSON(dietPlan, 'dietPlan');
-        
-        if (pharmacy) {
-            const rawPharmacy = parseJSON(pharmacy, 'pharmacy');
-            if (Array.isArray(rawPharmacy)) {
-                appointment.treatmentPlan.pharmacy = rawPharmacy.map(item => ({
-                    medicineName: item.name || item.medicineName,
-                    frequency: item.frequency || '',
-                    duration: item.duration || ''
-                }));
-            }
-        }
-
-        // Sync legacy root fields to ensure compatibility
-        appointment.labTests = appointment.treatmentPlan.labTests;
-        appointment.dietPlan = appointment.treatmentPlan.dietPlan;
-        appointment.pharmacy = appointment.treatmentPlan.pharmacy;
-        appointment.notes = appointment.treatmentPlan.diagnosis; // Sync notes
-
-        const savedDoc = await appointment.save();
-        console.log("[BACKEND] Plan Saved Successfully");
-
-        res.json({ success: true, message: 'Treatment plan updated', appointment: savedDoc });
-
-    } catch (error) {
-        console.error("Update Plan Error:", error);
-        res.status(500).json({ success: false, message: 'Failed to update plan', error: error.message });
-    }
-});
-
-// --- 3. Get Single Appointment (For Doctor Details) ---
-router.get('/details/:id', verifyToken, async (req, res) => {
-    try {
-        const appointment = await Appointment.findById(req.params.id)
-            .populate('userId', 'name email phone patientId')
-            .lean();
-        if (!appointment) return res.status(404).json({ message: 'Not found' });
-        res.json({ success: true, appointment });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error fetching details' });
-    }
-});
-
-// --- 4. Get My Appointments (For User Dashboard) ---
+// --- 2. Get My Appointments ---
 router.get('/my-appointments', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    // Explicitly select treatmentPlan and other fields
+    // [DEBUG] Log Request
+    console.log("==========================================");
+    console.log(`[BACKEND] Fetching appointments for User ID: ${userId}`);
+
+    // [FIX] Explicitly select all fields to ensure they are returned to frontend
+    // Added: doctorNotes, symptoms, diagnosis, ivfDetails
     const appointments = await Appointment.find({ userId })
-      .select('userId patientId doctorId doctorName serviceName appointmentDate appointmentTime status amount notes treatmentPlan prescription prescriptions labTests dietPlan pharmacy ivfDetails')
+      .select('userId patientId doctorId doctorName serviceName appointmentDate appointmentTime status paymentStatus amount notes doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
       .sort({ appointmentDate: -1, appointmentTime: -1 })
       .lean(); 
     
+    // [DEBUG] Log Results
+    if (appointments.length > 0) {
+        const first = appointments[0];
+        console.log(`[BACKEND] Found ${appointments.length} appointments. Inspecting top result:`);
+        console.log(` - ID: ${first._id}`);
+        console.log(` - doctorNotes: ${first.doctorNotes ? '✅ Present' : '❌ Empty'}`);
+        console.log(` - ivfDetails: ${first.ivfDetails ? '✅ Present' : '❌ Empty'}`);
+        console.log(` - pharmacy: ${first.pharmacy && first.pharmacy.length > 0 ? `✅ ${first.pharmacy.length} items` : '❌ Empty'}`);
+    } else {
+        console.log("[BACKEND] No appointments found.");
+    }
+    console.log("==========================================");
+
     res.status(200).json({ success: true, appointments });
   } catch (error) {
     console.error('Fetch appointments error:', error);
     res.status(500).json({ success: false, message: 'Error fetching appointments' });
-  }
-});
-
-// --- 5. Get Latest Appointment for Patient (For Doctor) ---
-router.get('/patient/:patientId/latest', verifyToken, async (req, res) => {
-  try {
-    const patientId = req.params.patientId;
-    const appointment = await Appointment.findOne({ patientId })
-      .sort({ appointmentDate: -1, appointmentTime: -1 })
-      .populate('userId', 'name email phone patientId')
-      .lean();
-    if (!appointment) return res.status(404).json({ message: 'No appointment found for this patient' });
-    res.json({ success: true, appointment });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching latest appointment' });
   }
 });
 
