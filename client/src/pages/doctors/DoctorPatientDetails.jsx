@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
-import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
-import './Patient.css'; // Ensure this is imported
+import { deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice'; // Removed updatePrescription as we use direct API for this specific complex save
+import apiClient from '../../utils/api'; // [FIX] Import apiClient for direct robust saving
+import './Patient.css';
 
 // --- IVF RELATED DATA CONSTANTS ---
 const IVF_LAB_TESTS = [
@@ -137,7 +138,8 @@ const DoctorPatientDetails = () => {
   const dispatch = useAppDispatch();
   const { appointments, patientHistory } = useDoctors();
   
-  const appointment = appointments.find(a => a._id === appointmentId);
+  // Local state to hold the appointment data (either from Redux or fresh fetch)
+  const [appointment, setAppointment] = useState(null);
   
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -152,36 +154,55 @@ const DoctorPatientDetails = () => {
   const [selectedMedNames, setSelectedMedNames] = useState([]); 
   const [pharmacyDetails, setPharmacyDetails] = useState([]);
 
+  // 1. [FIX] Load Data logic - Prioritizes new 'treatmentPlan' structure
   useEffect(() => {
-    if (appointment) {
-      setNotes(appointment.notes || '');
-      if (appointment.labTests) setSelectedLabs(appointment.labTests);
-      if (appointment.dietPlan || appointment.diet) setSelectedDiet(appointment.dietPlan || appointment.diet);
-      if (appointment.pharmacy) {
-        // Map backend structure (medicineName) to frontend structure (name)
-        const mappedPharmacy = appointment.pharmacy.map(p => ({
-            name: p.medicineName || p.name,
-            frequency: p.frequency || '',
-            duration: p.duration || ''
-        }));
-        setPharmacyDetails(mappedPharmacy);
-        setSelectedMedNames(mappedPharmacy.map(p => p.name));
-      }
+    const loadData = async () => {
+        // Try getting from Redux first
+        let currentAppt = appointments.find(a => a._id === appointmentId);
 
-      // Fetch History if we have a patientId (or userId)
-      const pId = appointment.patientId || appointment.userId?._id;
-      if (pId) {
-          dispatch(fetchPatientHistory(pId));
-      }
-    }
-  }, [appointment, dispatch]);
+        // If not found or details missing, try fetching specific details (Optional robustness)
+        if (!currentAppt && appointmentId) {
+            try {
+                const res = await apiClient.get(`/api/appointments/details/${appointmentId}`);
+                if (res.data.success) currentAppt = res.data.appointment;
+            } catch (e) { console.error("Could not fetch details", e); }
+        }
+
+        if (currentAppt) {
+            setAppointment(currentAppt);
+            
+            // [FIX] Read from nested treatmentPlan object if it exists
+            const plan = currentAppt.treatmentPlan || {};
+            
+            setNotes(plan.diagnosis || currentAppt.notes || '');
+            setSelectedLabs(plan.labTests || currentAppt.labTests || []);
+            setSelectedDiet(plan.dietPlan || currentAppt.dietPlan || []);
+            
+            // Handle Pharmacy
+            const rawPharmacy = plan.pharmacy || currentAppt.pharmacy || [];
+            if (rawPharmacy.length > 0) {
+                const mappedPharmacy = rawPharmacy.map(p => ({
+                    name: p.medicineName || p.name,
+                    frequency: p.frequency || '',
+                    duration: p.duration || ''
+                }));
+                setPharmacyDetails(mappedPharmacy);
+                setSelectedMedNames(mappedPharmacy.map(p => p.name));
+            }
+
+            // Fetch History
+            const pId = currentAppt.patientId || currentAppt.userId?._id;
+            if (pId) dispatch(fetchPatientHistory(pId));
+        }
+    };
+    loadData();
+  }, [appointmentId, appointments, dispatch]);
 
   const handleMedNameChange = (newNames) => {
     setSelectedMedNames(newNames);
     
     // Sync detailed array with names
     setPharmacyDetails(prev => {
-      // Keep existing details if name is still selected
       const updated = newNames.map(name => {
         const existing = prev.find(p => p.name === name);
         return existing || { name, frequency: '', duration: '' };
@@ -205,25 +226,38 @@ const DoctorPatientDetails = () => {
     }
   };
 
+  // 2. [FIX] Updated Handle Save - Uses direct API to specific route
   const handleSave = async () => {
+    if (!appointment) return;
     setIsUploading(true);
+
     const formData = new FormData();
     if (file) formData.append('prescriptionFile', file);
+    
+    // Core fields
     formData.append('diagnosis', notes);
     formData.append('status', 'completed');
 
-    // Append JSON strings for complex arrays
+    // [CRITICAL FIX] Stringify arrays so Backend can parse them correctly from FormData
     formData.append('labTests', JSON.stringify(selectedLabs));
     formData.append('dietPlan', JSON.stringify(selectedDiet));
     formData.append('pharmacy', JSON.stringify(pharmacyDetails));
 
     try {
-      await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
-      alert('Treatment plan updated successfully!');
-      setFile(null);
-      setPreview(null);
+      // Use direct API call to the new route that handles the 'treatmentPlan' schema
+      const res = await apiClient.put(`/api/appointments/update-plan/${appointmentId}`, formData, {
+         headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data.success) {
+          alert('Treatment plan updated successfully!');
+          setAppointment(res.data.appointment); // Update local state immediately
+          setFile(null);
+          setPreview(null);
+      }
     } catch (err) {
-      alert('Failed to update: ' + err);
+      console.error(err);
+      alert('Failed to update: ' + (err.response?.data?.message || err.message));
     } finally {
       setIsUploading(false);
     }
@@ -234,12 +268,13 @@ const DoctorPatientDetails = () => {
       try {
           await dispatch(deletePrescription({ appointmentId, prescriptionId })).unwrap();
           alert("Prescription removed.");
+          // Refresh data if needed, or rely on Redux update
       } catch (err) {
           alert("Failed to remove: " + err);
       }
   };
 
-  if (!appointment) return <div className="patient-container">Appointment not found.</div>;
+  if (!appointment) return <div className="patient-container">Loading appointment details...</div>;
 
   const getPrescriptionsList = () => {
       if (appointment.prescriptions && appointment.prescriptions.length > 0) return appointment.prescriptions;
@@ -248,8 +283,6 @@ const DoctorPatientDetails = () => {
   };
 
   const prescriptionsList = getPrescriptionsList();
-  
-  // Get patient identifier string
   const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
 
   return (
