@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
 import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
 import './Patient.css'; // Ensure this is imported
@@ -138,94 +139,89 @@ const DoctorPatientDetails = () => {
   const { appointments, patientHistory } = useDoctors();
   
   const appointment = appointments.find(a => a._id === appointmentId);
-  
-  const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
 
-  // --- STATES ---
-  const [selectedLabs, setSelectedLabs] = useState([]);
-  const [selectedDiet, setSelectedDiet] = useState([]);
-  
-  // Pharmacy
-  const [selectedMedNames, setSelectedMedNames] = useState([]); 
-  const [pharmacyDetails, setPharmacyDetails] = useState([]);
+  // --- React Hook Form ---
+  const { register, control, handleSubmit, setValue, watch, reset, formState: { isSubmitting } } = useForm({
+    defaultValues: {
+      labTests: [],
+      dietPlan: [],
+      pharmacy: [],
+      prescriptionDescription: '',
+      prescriptionFile: null
+    }
+  });
 
+  // Load existing data
   useEffect(() => {
     if (appointment) {
-      setNotes(appointment.notes || '');
-      if (appointment.labTests) setSelectedLabs(appointment.labTests);
-      if (appointment.dietPlan || appointment.diet) setSelectedDiet(appointment.dietPlan || appointment.diet);
-      if (appointment.pharmacy) {
-        // Map backend structure (medicineName) to frontend structure (name)
-        const mappedPharmacy = appointment.pharmacy.map(p => ({
-            name: p.medicineName || p.name,
+      setValue('labTests', appointment.labTests || []);
+      setValue('dietPlan', appointment.dietPlan || appointment.diet || []);
+      setValue('prescriptionDescription', appointment.prescriptionDescription || appointment.notes || '');
+
+      // Map pharmacy data
+      if (appointment.pharmacy && appointment.pharmacy.length > 0) {
+         const mappedPharmacy = appointment.pharmacy.map(p => ({
+            medicineName: p.medicineName || p.name,
             frequency: p.frequency || '',
             duration: p.duration || ''
-        }));
-        setPharmacyDetails(mappedPharmacy);
-        setSelectedMedNames(mappedPharmacy.map(p => p.name));
+         }));
+         setValue('pharmacy', mappedPharmacy);
       }
 
-      // Fetch History if we have a patientId (or userId)
+      // Fetch History
       const pId = appointment.patientId || appointment.userId?._id;
       if (pId) {
           dispatch(fetchPatientHistory(pId));
       }
     }
-  }, [appointment, dispatch]);
+  }, [appointment, dispatch, setValue]);
 
-  const handleMedNameChange = (newNames) => {
-    setSelectedMedNames(newNames);
-    
-    // Sync detailed array with names
-    setPharmacyDetails(prev => {
-      // Keep existing details if name is still selected
-      const updated = newNames.map(name => {
-        const existing = prev.find(p => p.name === name);
-        return existing || { name, frequency: '', duration: '' };
-      });
-      return updated;
-    });
-  };
-
-  const handlePharmacyDetailChange = (index, field, value) => {
-    const updated = [...pharmacyDetails];
-    updated[index] = { ...updated[index], [field]: value };
-    setPharmacyDetails(updated);
-  };
-
+  // Handle File Preview
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setPreview(objectUrl);
-    }
+      const selectedFile = e.target.files[0];
+      if (selectedFile) {
+          const objectUrl = URL.createObjectURL(selectedFile);
+          setPreview(objectUrl);
+      } else {
+          setPreview(null);
+      }
   };
 
-  const handleSave = async () => {
-    setIsUploading(true);
+  // Handle Medication Name Selection (Syncs with RHF pharmacy array)
+  const handlePharmacySelection = (selectedNames, currentPharmacyValues, onChange) => {
+    // 1. Filter out items that were deselected
+    const keptItems = currentPharmacyValues.filter(item => selectedNames.includes(item.medicineName));
+    
+    // 2. Add new items that were selected
+    const newItems = selectedNames
+        .filter(name => !currentPharmacyValues.some(item => item.medicineName === name))
+        .map(name => ({ medicineName: name, frequency: '', duration: '' }));
+    
+    onChange([...keptItems, ...newItems]);
+  };
+
+  const onSubmit = async (data) => {
     const formData = new FormData();
-    if (file) formData.append('prescriptionFile', file);
-    formData.append('diagnosis', notes);
+    // Unified payload
+    formData.append('diagnosis', data.prescriptionDescription); // Map to legacy diagnosis/notes
+    formData.append('prescriptionDescription', data.prescriptionDescription); // Save to new field
     formData.append('status', 'completed');
 
-    // Append JSON strings for complex arrays
-    formData.append('labTests', JSON.stringify(selectedLabs));
-    formData.append('dietPlan', JSON.stringify(selectedDiet));
-    formData.append('pharmacy', JSON.stringify(pharmacyDetails));
+    formData.append('labTests', JSON.stringify(data.labTests));
+    formData.append('dietPlan', JSON.stringify(data.dietPlan));
+    formData.append('pharmacy', JSON.stringify(data.pharmacy));
+
+    if (data.prescriptionFile && data.prescriptionFile.length > 0) {
+      formData.append('prescriptionFile', data.prescriptionFile[0]);
+    }
 
     try {
       await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
-      alert('Treatment plan updated successfully!');
-      setFile(null);
+      alert('Treatment plan and prescription updated successfully!');
       setPreview(null);
     } catch (err) {
       alert('Failed to update: ' + err);
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -241,16 +237,18 @@ const DoctorPatientDetails = () => {
 
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
+  // Documents list helper
   const getPrescriptionsList = () => {
       if (appointment.prescriptions && appointment.prescriptions.length > 0) return appointment.prescriptions;
       if (appointment.prescription) return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
       return [];
   };
-
   const prescriptionsList = getPrescriptionsList();
-  
-  // Get patient identifier string
   const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
+  
+  // Watch pharmacy field for rendering dynamic inputs
+  const pharmacyValues = watch('pharmacy') || [];
+  const selectedMedNames = pharmacyValues.map(p => p.medicineName);
 
   return (
     <div className="patient-page">
@@ -281,130 +279,161 @@ const DoctorPatientDetails = () => {
                                 <div className="history-date">{new Date(hist.appointmentDate).toLocaleDateString()}</div>
                                 <div className="history-service">{hist.serviceName}</div>
                                 <div className="history-status">{hist.status}</div>
-                                <div className="history-notes">{hist.notes || 'No notes'}</div>
+                                <div className="history-notes">
+                                    {hist.prescriptionDescription || hist.notes || 'No notes'}
+                                </div>
                             </div>
                         ))}
-                        {patientHistory.filter(h => h._id !== appointment._id).length === 0 && (
-                            <p className="no-history">No previous visits recorded.</p>
-                        )}
                     </div>
                 </div>
             )}
 
             <hr className="divider" />
 
-            {/* --- TREATMENT PLAN --- */}
-            <h3>Treatment Plan</h3>
-            
-            <div className="form-group-row">
-                <MultiSelectDropdown 
-                    title="Lab Tests (IVF)" 
-                    options={IVF_LAB_TESTS} 
-                    selected={selectedLabs} 
-                    onChange={setSelectedLabs} 
-                />
-            </div>
+            {/* --- UNIFIED TREATMENT FORM --- */}
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <h3>Treatment Plan</h3>
+                
+                {/* Lab Tests */}
+                <div className="form-group-row">
+                    <Controller
+                        name="labTests"
+                        control={control}
+                        render={({ field }) => (
+                            <MultiSelectDropdown 
+                                title="Lab Tests (IVF)" 
+                                options={IVF_LAB_TESTS} 
+                                selected={field.value} 
+                                onChange={field.onChange} 
+                            />
+                        )}
+                    />
+                </div>
 
-            <div className="form-group-row">
-                <MultiSelectDropdown 
-                    title="Dietary Recommendations" 
-                    options={IVF_DIET_PLAN} 
-                    selected={selectedDiet} 
-                    onChange={setSelectedDiet} 
-                />
-            </div>
+                {/* Diet Plan */}
+                <div className="form-group-row">
+                    <Controller
+                        name="dietPlan"
+                        control={control}
+                        render={({ field }) => (
+                            <MultiSelectDropdown 
+                                title="Dietary Recommendations" 
+                                options={IVF_DIET_PLAN} 
+                                selected={field.value} 
+                                onChange={field.onChange} 
+                            />
+                        )}
+                    />
+                </div>
 
-            <div className="form-group-row">
-                <MultiSelectDropdown 
-                    title="Pharmacy & Medications" 
-                    options={IVF_MEDICATIONS} 
-                    selected={selectedMedNames} 
-                    onChange={handleMedNameChange} 
-                />
+                {/* Pharmacy & Medications */}
+                <div className="form-group-row">
+                    <Controller
+                        name="pharmacy"
+                        control={control}
+                        render={({ field }) => (
+                            <MultiSelectDropdown 
+                                title="Pharmacy & Medications" 
+                                options={IVF_MEDICATIONS} 
+                                selected={selectedMedNames} 
+                                onChange={(newNames) => handlePharmacySelection(newNames, field.value, field.onChange)} 
+                            />
+                        )}
+                    />
 
-                {pharmacyDetails.length > 0 && (
-                    <div className="pharmacy-details-box">
-                        <h4>Medication Details</h4>
-                        {pharmacyDetails.map((med, index) => (
-                            <div key={index} className="medication-row">
-                                <div className="med-name">{med.name}</div>
-                                
-                                <select 
-                                    value={med.frequency}
-                                    onChange={(e) => handlePharmacyDetailChange(index, 'frequency', e.target.value)}
-                                    className="med-input"
-                                >
-                                    <option value="">Select Frequency</option>
-                                    {FREQUENCY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
+                    {pharmacyValues.length > 0 && (
+                        <div className="pharmacy-details-box">
+                            <h4>Medication Details</h4>
+                            {pharmacyValues.map((item, index) => (
+                                <div key={item.medicineName} className="medication-row">
+                                    <div className="med-name">{item.medicineName}</div>
+                                    
+                                    {/* Register dynamic inputs directly to pharmacy array path */}
+                                    <select 
+                                        {...register(`pharmacy.${index}.frequency`)}
+                                        className="med-input"
+                                    >
+                                        <option value="">Select Frequency</option>
+                                        {FREQUENCY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    </select>
 
-                                <input 
-                                    type="text" 
-                                    placeholder="Duration (e.g. 5 days)" 
-                                    value={med.duration}
-                                    onChange={(e) => handlePharmacyDetailChange(index, 'duration', e.target.value)}
-                                    className="med-input"
-                                />
-                            </div>
-                        ))}
-                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Duration (e.g. 5 days)" 
+                                        {...register(`pharmacy.${index}.duration`)}
+                                        className="med-input"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                
+                <hr className="divider" />
+
+                {/* --- DOCUMENTS & NOTES --- */}
+                <div className="prescriptions-section">
+                    <h3>Uploaded Documents</h3>
+                    {prescriptionsList.length === 0 ? (
+                        <p className="no-docs-text">No documents uploaded yet.</p>
+                    ) : (
+                        <div className="prescriptions-list">
+                            {prescriptionsList.map((item, index) => (
+                                <div key={item._id || index} className="prescription-item">
+                                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
+                                        <div className="doc-icon">📄</div>
+                                        <div className="doc-name">{item.name || 'Document'}</div>
+                                    </a>
+                                    {item._id !== 'legacy' && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => handleDeletePrescription(item._id)} 
+                                            className="doc-remove-btn"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <h3 className="section-title">Add Prescription File & Notes</h3>
+                <div className="form-group">
+                    <input 
+                        type="file" 
+                        accept="image/*,.pdf" 
+                        {...register('prescriptionFile', {
+                            onChange: handleFileChange
+                        })}
+                        className="file-input" 
+                    />
+                </div>
+
+                {preview && !watch('prescriptionFile')?.[0]?.type?.includes('pdf') && (
+                  <div className="preview-container">
+                    <img src={preview} alt="Preview" />
+                  </div>
                 )}
-            </div>
-            
-            <hr className="divider" />
 
-            {/* Documents Section */}
-            <div className="prescriptions-section">
-                <h3>Uploaded Documents</h3>
-                {prescriptionsList.length === 0 ? (
-                    <p className="no-docs-text">No documents uploaded yet.</p>
-                ) : (
-                    <div className="prescriptions-list">
-                        {prescriptionsList.map((item, index) => (
-                            <div key={item._id || index} className="prescription-item">
-                                <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
-                                    <div className="doc-icon">📄</div>
-                                    <div className="doc-name">{item.name || 'Document'}</div>
-                                </a>
-                                {item._id !== 'legacy' && (
-                                    <button onClick={() => handleDeletePrescription(item._id)} className="doc-remove-btn">
-                                        Remove
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+                <div className="form-group">
+                    <textarea 
+                        rows="4"
+                        className="notes-input"
+                        {...register('prescriptionDescription')}
+                        placeholder="Prescription / Diagnosis notes..."
+                    />
+                </div>
 
-            <h3 className="section-title">Add File / Notes</h3>
-            <div className="form-group">
-                <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="file-input" />
-            </div>
-
-            {preview && file && !file.type.includes('pdf') && (
-              <div className="preview-container">
-                <img src={preview} alt="Preview" />
-              </div>
-            )}
-
-            <div className="form-group">
-                <textarea 
-                    rows="4"
-                    className="notes-input"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="General diagnosis notes..."
-                />
-            </div>
-
-            <button 
-              onClick={handleSave} 
-              className="auth-button save-btn"
-              disabled={isUploading}
-            >
-              {isUploading ? 'Saving...' : 'Save Treatment Plan'}
-            </button>
+                <button 
+                  type="submit"
+                  className="auth-button save-btn"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving & Uploading...' : 'Save & Upload'}
+                </button>
+            </form>
         </div>
       </div>
     </div>

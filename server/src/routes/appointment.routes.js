@@ -12,10 +12,9 @@ router.post('/create', verifyToken, async (req, res) => {
     console.log("------------------------------------------");
     console.log("[BACKEND] Incoming Create Request Body:", JSON.stringify(req.body, null, 2));
     
-    // [FIX] Destructure ALL fields, including the new ones for IVF/Doctor details
     const { 
       doctorId, serviceId, serviceName, appointmentDate, appointmentTime, amount, 
-      notes, doctorNotes, symptoms, diagnosis, ivfDetails, pharmacy, labTests, dietPlan 
+      notes, doctorNotes, symptoms, diagnosis, prescriptionDescription, ivfDetails, pharmacy, labTests, dietPlan 
     } = req.body;
 
     const userId = req.user.userId;
@@ -100,7 +99,7 @@ router.post('/create', verifyToken, async (req, res) => {
         return res.status(400).json({ success: false, message: 'This slot is already booked.' });
     }
 
-    // [FIX] Save Appointment with ALL FIELDS
+    // Save Appointment with ALL FIELDS
     const appointment = new Appointment({
       userId: userId,
       patientId: patientId, 
@@ -113,8 +112,8 @@ router.post('/create', verifyToken, async (req, res) => {
       appointmentTime: appointmentTime,
       amount: amount || doctorDoc.consultationFee || 500,
       
-      // Explicitly passing the new data (previously these were missing)
       notes: notes || '',
+      prescriptionDescription: prescriptionDescription || '',
       doctorNotes: doctorNotes || '', 
       symptoms: symptoms || '',
       diagnosis: diagnosis || '',
@@ -145,30 +144,12 @@ router.get('/my-appointments', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    // [DEBUG] Log Request
-    console.log("==========================================");
-    console.log(`[BACKEND] Fetching appointments for User ID: ${userId}`);
-
-    // [FIX] Explicitly select all fields to ensure they are returned to frontend
-    // Added: doctorNotes, symptoms, diagnosis, ivfDetails
+    // Explicitly select all fields to ensure they are returned to frontend
     const appointments = await Appointment.find({ userId })
-      .select('userId patientId doctorId doctorName serviceName appointmentDate appointmentTime status paymentStatus amount notes doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
+      .select('userId patientId doctorId doctorName serviceName appointmentDate appointmentTime status paymentStatus amount notes prescriptionDescription doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
       .sort({ appointmentDate: -1, appointmentTime: -1 })
       .lean(); 
     
-    // [DEBUG] Log Results
-    if (appointments.length > 0) {
-        const first = appointments[0];
-        console.log(`[BACKEND] Found ${appointments.length} appointments. Inspecting top result:`);
-        console.log(` - ID: ${first._id}`);
-        console.log(` - doctorNotes: ${first.doctorNotes ? '✅ Present' : '❌ Empty'}`);
-        console.log(` - ivfDetails: ${first.ivfDetails ? '✅ Present' : '❌ Empty'}`);
-        console.log(` - pharmacy: ${first.pharmacy && first.pharmacy.length > 0 ? `✅ ${first.pharmacy.length} items` : '❌ Empty'}`);
-    } else {
-        console.log("[BACKEND] No appointments found.");
-    }
-    console.log("==========================================");
-
     res.status(200).json({ success: true, appointments });
   } catch (error) {
     console.error('Fetch appointments error:', error);

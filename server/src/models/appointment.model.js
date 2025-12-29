@@ -76,15 +76,19 @@ const appointmentSchema = new mongoose.Schema({
     default: 0
   },
   
-  // --- FIELDS THAT WERE PREVIOUSLY MISSING OR NOT SAVING ---
+  // --- CLINICAL DATA & NOTES ---
   
-  // 1. General Notes
+  // 1. General Notes (Legacy / Diagnosis)
   notes: {
     type: String,
     default: '' 
   },
+  // 2. Prescription Description (Explicit field for Unified Form)
+  prescriptionDescription: {
+    type: String,
+    default: ''
+  },
   
-  // 2. Clinical Data
   doctorNotes: {
     type: String,
     default: ''
@@ -109,14 +113,13 @@ const appointmentSchema = new mongoose.Schema({
     trim: true
   }],
 
-  pharmacy: [pharmacyItemSchema], // Maps to 'medicines' in frontend
+  pharmacy: [pharmacyItemSchema], 
 
   // 4. IVF Specific Data (Flexible Object)
   ivfDetails: {
-    type: mongoose.Schema.Types.Mixed, // Allows generic object structure
+    type: mongoose.Schema.Types.Mixed, 
     default: {}
   },
-  // -------------------------------------
 
   // Legacy single prescription file
   prescription: {
