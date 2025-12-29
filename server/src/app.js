@@ -11,6 +11,8 @@ const doctorRoutes = require('./routes/doctor.routes')
 const adminEntitiesRoutes = require('./routes/admin-entities.routes')
 const publicRoutes = require('./routes/public.routes')
 const uploadRoutes = require('./routes/upload.routes')
+// --- NEW IMPORT ---
+const treatmentPlanRoutes = require('./routes/treatmentPlan.routes')
 
 const app = express()
 
@@ -37,6 +39,8 @@ app.use('/api/doctor', doctorRoutes);
 app.use('/api/admin-entities', adminEntitiesRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/upload', uploadRoutes);
+// --- MOUNT NEW ROUTE ---
+app.use('/api/treatment-plans', treatmentPlanRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

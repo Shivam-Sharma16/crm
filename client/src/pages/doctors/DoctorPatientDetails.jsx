@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
-import { useAppDispatch, useDoctors } from '../../store/hooks';
-import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
+import { useAppDispatch, useDoctors, useAppSelector } from '../../store/hooks';
+import { 
+    saveTreatmentPlan, 
+    fetchTreatmentPlan, 
+    fetchPatientHistory, 
+    deletePlanFile,
+    clearCurrentPlan
+} from '../../store/slices/doctorSlice';
 import './Patient.css'; 
 
 // --- IVF RELATED DATA CONSTANTS ---
@@ -78,7 +84,7 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
   }, []);
 
   const toggleOption = (option) => {
-    const currentSelected = selected || []; // Safety check
+    const currentSelected = selected || []; 
     let newSelected;
     if (currentSelected.includes(option)) {
       newSelected = currentSelected.filter(item => item !== option);
@@ -122,7 +128,6 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
         </div>
       )}
       
-      {/* Selected Tags Display */}
       <div className="multiselect-tags">
         {safeSelected.map(item => (
           <span key={item} className="multiselect-tag">
@@ -141,6 +146,9 @@ const DoctorPatientDetails = () => {
   const dispatch = useAppDispatch();
   const { appointments, patientHistory } = useDoctors();
   
+  // New selector for the separate plan
+  const { currentTreatmentPlan } = useAppSelector(state => state.doctors);
+  
   const appointment = appointments.find(a => a._id === appointmentId);
   const [preview, setPreview] = useState(null);
 
@@ -155,33 +163,37 @@ const DoctorPatientDetails = () => {
     }
   });
 
-  // Load existing data
+  // 1. Initial Load: Fetch History & Plan
+  useEffect(() => {
+    if (appointmentId) {
+        dispatch(fetchTreatmentPlan(appointmentId));
+    }
+    // Cleanup on unmount
+    return () => { dispatch(clearCurrentPlan()); };
+  }, [appointmentId, dispatch]);
+
   useEffect(() => {
     if (appointment) {
-      setValue('labTests', appointment.labTests || []);
-      setValue('dietPlan', appointment.dietPlan || appointment.diet || []);
-      // Map legacy notes or new prescriptionDescription
-      setValue('prescriptionDescription', appointment.prescriptionDescription || appointment.notes || '');
-
-      // Map pharmacy data
-      if (appointment.pharmacy && appointment.pharmacy.length > 0) {
-         const mappedPharmacy = appointment.pharmacy.map(p => ({
-            medicineName: p.medicineName || p.name,
-            frequency: p.frequency || '',
-            duration: p.duration || ''
-         }));
-         setValue('pharmacy', mappedPharmacy);
-      } else {
-        setValue('pharmacy', []);
-      }
-
-      // Fetch History
-      const pId = appointment.patientId || appointment.userId?._id;
-      if (pId) {
-          dispatch(fetchPatientHistory(pId));
-      }
+        const pId = appointment.patientId || appointment.userId?._id;
+        if (pId) dispatch(fetchPatientHistory(pId));
     }
-  }, [appointment, dispatch, setValue]);
+  }, [appointment, dispatch]);
+
+  // 2. Populate Form when currentTreatmentPlan arrives
+  useEffect(() => {
+    if (currentTreatmentPlan) {
+        setValue('labTests', currentTreatmentPlan.labTests || []);
+        setValue('dietPlan', currentTreatmentPlan.dietPlan || []);
+        setValue('prescriptionDescription', currentTreatmentPlan.prescriptionDescription || currentTreatmentPlan.diagnosis || '');
+        
+        // Map pharmacy if exists
+        if (currentTreatmentPlan.pharmacy && currentTreatmentPlan.pharmacy.length > 0) {
+            setValue('pharmacy', currentTreatmentPlan.pharmacy);
+        } else {
+            setValue('pharmacy', []);
+        }
+    }
+  }, [currentTreatmentPlan, setValue]);
 
   // Handle File Preview
   const handleFileChange = (e) => {
@@ -211,12 +223,12 @@ const DoctorPatientDetails = () => {
 
   const onSubmit = async (data) => {
     const formData = new FormData();
-    // Unified payload
+    // Unified payload structure for Treatment Plan
     formData.append('diagnosis', data.prescriptionDescription || ''); 
     formData.append('prescriptionDescription', data.prescriptionDescription || ''); 
     formData.append('status', 'completed');
 
-    // Safe stringify with default empty arrays
+    // JSON Stringify complex arrays
     formData.append('labTests', JSON.stringify(data.labTests || []));
     formData.append('dietPlan', JSON.stringify(data.dietPlan || []));
     formData.append('pharmacy', JSON.stringify(data.pharmacy || []));
@@ -226,36 +238,33 @@ const DoctorPatientDetails = () => {
     }
 
     try {
-      await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
-      alert('Treatment plan and prescription updated successfully!');
+      // Using the NEW saveTreatmentPlan action
+      await dispatch(saveTreatmentPlan({ appointmentId, formData })).unwrap();
+      alert('Treatment plan saved successfully!');
       setPreview(null);
     } catch (err) {
-      alert('Failed to update: ' + err);
+      console.error(err);
+      alert('Failed to save plan: ' + err);
     }
   };
 
-  const handleDeletePrescription = async (prescriptionId) => {
-      if(!window.confirm("Are you sure you want to delete this prescription?")) return;
+  const handleRemoveFile = async (fileId) => {
+      if(!window.confirm("Are you sure you want to remove this file?")) return;
       try {
-          await dispatch(deletePrescription({ appointmentId, prescriptionId })).unwrap();
-          alert("Prescription removed.");
+          await dispatch(deletePlanFile({ appointmentId, fileId })).unwrap();
+          alert("File removed.");
       } catch (err) {
-          alert("Failed to remove: " + err);
+          alert("Failed to remove file: " + err);
       }
   };
 
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
-  const getPrescriptionsList = () => {
-      if (appointment.prescriptions && appointment.prescriptions.length > 0) return appointment.prescriptions;
-      if (appointment.prescription) return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
-      return [];
-  };
-  const prescriptionsList = getPrescriptionsList();
-  const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
-  
+  // Use attachments from the separate plan if available
+  const attachments = currentTreatmentPlan?.attachments || [];
   const pharmacyValues = watch('pharmacy') || [];
   const selectedMedNames = pharmacyValues.map(p => p.medicineName);
+  const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
 
   return (
     <div className="patient-page">
@@ -272,6 +281,7 @@ const DoctorPatientDetails = () => {
                 <div><strong>Patient:</strong> {appointment.userId?.name}</div>
                 <div><strong>Service:</strong> {appointment.serviceName}</div>
                 <div><strong>Date:</strong> {new Date(appointment.appointmentDate).toDateString()}</div>
+                <div className="status-tag">Status: {appointment.status}</div>
             </div>
 
             <hr className="divider" />
@@ -285,7 +295,6 @@ const DoctorPatientDetails = () => {
                             <div key={idx} className="history-item">
                                 <div className="history-date">{new Date(hist.appointmentDate).toLocaleDateString()}</div>
                                 <div className="history-service">{hist.serviceName}</div>
-                                <div className="history-status">{hist.status}</div>
                                 <div className="history-notes">
                                     {hist.prescriptionDescription || hist.notes || 'No notes'}
                                 </div>
@@ -379,33 +388,31 @@ const DoctorPatientDetails = () => {
 
                 {/* --- DOCUMENTS & NOTES --- */}
                 <div className="prescriptions-section">
-                    <h3>Uploaded Documents</h3>
-                    {prescriptionsList.length === 0 ? (
-                        <p className="no-docs-text">No documents uploaded yet.</p>
+                    <h3>Uploaded Documents / Files</h3>
+                    {attachments.length === 0 ? (
+                        <p className="no-docs-text">No files uploaded yet.</p>
                     ) : (
                         <div className="prescriptions-list">
-                            {prescriptionsList.map((item, index) => (
+                            {attachments.map((item, index) => (
                                 <div key={item._id || index} className="prescription-item">
                                     <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
                                         <div className="doc-icon">📄</div>
                                         <div className="doc-name">{item.name || 'Document'}</div>
                                     </a>
-                                    {item._id !== 'legacy' && (
-                                        <button 
-                                            type="button" 
-                                            onClick={() => handleDeletePrescription(item._id)} 
-                                            className="doc-remove-btn"
-                                        >
-                                            Remove
-                                        </button>
-                                    )}
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleRemoveFile(item._id)} 
+                                        className="doc-remove-btn"
+                                    >
+                                        Remove
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
 
-                <h3 className="section-title">Add Prescription File & Notes</h3>
+                <h3 className="section-title">Add File & Notes</h3>
                 <div className="form-group">
                     <input 
                         type="file" 
