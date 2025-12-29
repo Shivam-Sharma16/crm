@@ -1,8 +1,7 @@
-// client/src/store/slices/doctorSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/api';
 
-// Fetch Appointments
+// Fetch Doctor Appointments
 export const fetchDoctorAppointments = createAsyncThunk(
   'doctors/fetchAppointments',
   async (_, { rejectWithValue }) => {
@@ -11,7 +10,7 @@ export const fetchDoctorAppointments = createAsyncThunk(
       if (response.data.success) return response.data.appointments || [];
       return rejectWithValue(response.data.message);
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch');
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch appointments');
     }
   }
 );
@@ -77,6 +76,7 @@ export const saveTreatmentPlan = createAsyncThunk(
   'doctors/saveTreatmentPlan',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
     try {
+      // Content-Type undefined lets browser set boundary for FormData
       const config = { headers: { 'Content-Type': undefined } };
       const response = await apiClient.post(`/api/treatment-plans/${appointmentId}`, formData, config);
       if (response.data.success) return response.data.plan;
@@ -101,7 +101,7 @@ export const deletePlanFile = createAsyncThunk(
     }
 );
 
-// Legacy Action: Update Prescription (Keep for backward compatibility if needed, or remove)
+// Legacy Action: Update Prescription (Keep for backward compatibility)
 export const updatePrescription = createAsyncThunk(
   'doctors/updatePrescription',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
@@ -219,7 +219,7 @@ const doctorSlice = createSlice({
         state.currentTreatmentPlan = action.payload; // Update with plan after file deletion
       })
 
-      // Legacy Handlers (Keep for safety or remove if unused)
+      // Legacy Handlers
       .addCase(updatePrescription.fulfilled, (state, action) => {
         const index = state.appointments.findIndex(app => app._id === action.payload._id);
         if (index !== -1) state.appointments[index] = action.payload;

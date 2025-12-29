@@ -128,6 +128,7 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
         </div>
       )}
       
+      {/* Selected Tags Display */}
       <div className="multiselect-tags">
         {safeSelected.map(item => (
           <span key={item} className="multiselect-tag">
