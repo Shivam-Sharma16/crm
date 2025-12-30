@@ -9,14 +9,15 @@ const ProtectedRoute = ({ children, allowedRoles = [], requireAuth = false }) =>
   if (requireAuth && !token) {
     return <Navigate to="/login" replace />;
   }
-
-  // If user is authenticated but not in allowed roles, redirect
+// If user is authenticated but not in allowed roles, redirect
   if (token && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     // Redirect based on role
     if (user.role === 'admin') {
       return <Navigate to="/admin" replace />;
     } else if (user.role === 'doctor') {
       return <Navigate to="/doctor/patients" replace />;
+    } else if (user.role === 'lab') {
+      return <Navigate to="/lab/dashboard" replace />; // <--- ADD THIS
     } else if (user.role === 'administrator') {
       return <Navigate to="/administrator" replace />;
     } else {

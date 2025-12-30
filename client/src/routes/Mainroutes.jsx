@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom'; // No BrowserRouter here (it's
 // Components
 import Navbar from '../components/Navbar';
 import Home from '../pages/Home';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 // User Pages
 import Services from '../pages/user/Services';
@@ -33,6 +34,10 @@ import AdminServices from '../pages/admin/AdminServices';
 import AdminLogin from '../pages/administration/AdminLogin';
 import AdminSignup from '../pages/administration/AdminSignup';
 import Administrator from '../pages/administration/Administrator';
+
+//lab
+import LabDashboard from '../pages/lab/LabDashboard';
+import AssignedTests from '../pages/lab/AssignedTests';
 
 export const MainRoutes = () => {
   return (
@@ -77,6 +82,24 @@ export const MainRoutes = () => {
         <Route path="/administrator/login" element={<AdminLogin />} />
         <Route path="/administrator/signup" element={<AdminSignup />} />
         <Route path="/administrator" element={<Administrator />} />
+
+        {/* --- Lab Routes --- */}
+        <Route path="/lab" element={
+            <ProtectedRoute allowedRoles={['lab']}>
+                <LabDashboard />
+            </ProtectedRoute>
+        } />
+        <Route path="/lab/dashboard" element={
+            <ProtectedRoute allowedRoles={['lab']}>
+                <LabDashboard />
+            </ProtectedRoute>
+        } />
+        <Route path="/lab/assigned-tests" element={
+            <ProtectedRoute allowedRoles={['lab']}>
+                <AssignedTests />
+            </ProtectedRoute>
+        } />
+        {/* Add Pending/Completed/Profile similarly */}
       </Routes>
     </>
   );

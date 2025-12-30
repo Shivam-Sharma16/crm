@@ -33,8 +33,8 @@ const Navbar = () => {
             Home
           </NavLink>
          
-          {/* Show user links only for regular users (not admin, not doctor) */}
-          {user?.role !== 'admin' && user?.role !== 'doctor' && (
+          {/* Show user links only for regular users (not admin, not doctor, NOT LAB) */}
+          {user?.role !== 'admin' && user?.role !== 'doctor' && user?.role !== 'lab' && (
             <>
               <NavLink 
                 to="/services" 
@@ -85,6 +85,30 @@ const Navbar = () => {
             >
               Patients
             </NavLink>
+          )}
+
+          {/* Show Lab links only for Lab users */}
+          {user?.role === 'lab' && isAuthenticated && (
+            <>
+              <NavLink 
+                to="/lab/dashboard" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Dashboard
+              </NavLink>
+              <NavLink 
+                to="/lab/assigned-tests" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Assigned Tests
+              </NavLink>
+              <NavLink 
+                to="/lab/completed-reports" 
+                className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+              >
+                Completed Reports
+              </NavLink>
+            </>
           )}
 
           {/* Show admin links only for admins */}
@@ -143,6 +167,7 @@ const Navbar = () => {
                     <div className="dropdown-user-info">
                       <span className="user-name">{user.name}</span>
                       <span className="user-email">{user.email}</span>
+                      {user.role && <span className="user-role-badge">{user.role}</span>}
                     </div>
                   )}
                   <button 
@@ -164,8 +189,6 @@ const Navbar = () => {
                   >
                     <span className="dropdown-icon">🔐</span>
                     Login
-                    {/* FIXED: Removed invalid/empty 'srcset' attribute */}
-                    <img src="./" alt="" />
                   </NavLink>
                   <NavLink 
                     to="/signup" 
