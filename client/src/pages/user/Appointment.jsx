@@ -356,7 +356,6 @@ const Appointment = () => {
     });
   };
 
-  // --- MODIFIED: Helper to Open Details Modal with Debugging ---
   const handleViewDetails = (apt) => {
     // 1. Log the entire object being passed to the modal
     console.log("--- OPENING DETAILS MODAL ---");
@@ -366,7 +365,7 @@ const Appointment = () => {
     // 2. Check for the specific fields you mentioned were missing
     console.log("Checking specific fields:");
     console.log(" - Lab Tests:", apt.labTests ? `Found (${apt.labTests.length})` : "MISSING/UNDEFINED");
-    console.log(" - Diet:", apt.diet ? `Found (${apt.diet.length})` : "MISSING/UNDEFINED");
+    console.log(" - Diet:", apt.dietPlan ? `Found (${apt.dietPlan.length})` : "MISSING/UNDEFINED");
     console.log(" - Pharmacy:", apt.pharmacy ? `Found (${apt.pharmacy.length})` : "MISSING/UNDEFINED");
     console.log(" - Notes:", apt.notes || "MISSING/UNDEFINED");
 
@@ -383,7 +382,6 @@ const Appointment = () => {
     return (
       <div className="appointment-page">
         <div className="content-wrapper">
-            {/* Added style to ensure loading is visible */}
             <div className="loading-state" style={{padding: '50px', textAlign: 'center', color: '#333'}}>
                 <p>Loading your appointments...</p>
             </div>
@@ -590,7 +588,7 @@ const Appointment = () => {
         </div>
       )}
 
-      {/* --- DETAILS MODAL WITH DEBUGGING --- */}
+      {/* --- DETAILS MODAL WITH UPDATES --- */}
       {showDetailsModal && selectedAppointment && (
         <div className="details-modal-overlay" onClick={() => setShowDetailsModal(false)}>
             <div className="details-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -623,12 +621,12 @@ const Appointment = () => {
                         )}
                     </div>
 
-                    {/* IVF Diet */}
+                    {/* IVF Diet - UPDATED: Changed from .diet to .dietPlan */}
                     <div className="detail-section">
                         <h4>🥗 Dietary Recommendations</h4>
-                        {selectedAppointment.diet && selectedAppointment.diet.length > 0 ? (
+                        {selectedAppointment.dietPlan && selectedAppointment.dietPlan.length > 0 ? (
                             <ul className="detail-list">
-                                {selectedAppointment.diet.map((item, i) => (
+                                {selectedAppointment.dietPlan.map((item, i) => (
                                     <li key={i}>{item}</li>
                                 ))}
                             </ul>
@@ -637,7 +635,7 @@ const Appointment = () => {
                         )}
                     </div>
 
-                    {/* Pharmacy Table */}
+                    {/* Pharmacy Table - UPDATED: Changed .name to .medicineName */}
                     <div className="detail-section">
                         <h4>💊 Medications</h4>
                         {selectedAppointment.pharmacy && selectedAppointment.pharmacy.length > 0 ? (
@@ -652,7 +650,7 @@ const Appointment = () => {
                                 <tbody>
                                     {selectedAppointment.pharmacy.map((med, i) => (
                                         <tr key={i}>
-                                            <td>{med.name}</td>
+                                            <td>{med.medicineName}</td>
                                             <td>{med.frequency || '-'}</td>
                                             <td>{med.duration || '-'}</td>
                                         </tr>

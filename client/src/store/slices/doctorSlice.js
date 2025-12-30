@@ -1,4 +1,3 @@
-// client/src/store/slices/doctorSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/api';
 
@@ -12,6 +11,20 @@ export const fetchDoctorAppointments = createAsyncThunk(
       return rejectWithValue(response.data.message);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch');
+    }
+  }
+);
+
+// --- NEW: Fetch Doctor's Patients (Unique List) ---
+export const fetchPatients = createAsyncThunk(
+  'doctors/fetchPatients',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get('/api/doctor/patients');
+      if (response.data.success) return response.data.patients || [];
+      return rejectWithValue(response.data.message);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch patients');
     }
   }
 );
@@ -58,7 +71,7 @@ export const updateAvailability = createAsyncThunk(
   }
 );
 
-// Update Prescription (Upload) - WITH DEBUG LOGS
+// Update Prescription (Upload) - Handles Notes, Labs, Diet, Pharmacy & Files
 export const updatePrescription = createAsyncThunk(
   'doctors/updatePrescription',
   async ({ appointmentId, formData }, { rejectWithValue }) => {
@@ -112,6 +125,7 @@ const doctorSlice = createSlice({
   name: 'doctors',
   initialState: {
     appointments: [],
+    patients: [], // Added state for patients
     patientHistory: [],
     loading: false,
     error: null,
@@ -119,7 +133,8 @@ const doctorSlice = createSlice({
   reducers: {
     clearAppointments: (state) => { state.appointments = []; },
     clearError: (state) => { state.error = null; },
-    clearHistory: (state) => { state.patientHistory = []; }
+    clearHistory: (state) => { state.patientHistory = []; },
+    clearPatients: (state) => { state.patients = []; } // Added clearer
   },
   extraReducers: (builder) => {
     builder
@@ -134,6 +149,20 @@ const doctorSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchDoctorAppointments.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // --- NEW: Fetch Patients ---
+      .addCase(fetchPatients.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPatients.fulfilled, (state, action) => {
+        state.loading = false;
+        state.patients = action.payload;
+      })
+      .addCase(fetchPatients.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
@@ -158,7 +187,7 @@ const doctorSlice = createSlice({
         }
       })
 
-      // Update Prescription
+      // Update Prescription (Syncs updated appointment data back to state)
       .addCase(updatePrescription.fulfilled, (state, action) => {
         const index = state.appointments.findIndex(app => app._id === action.payload._id);
         if (index !== -1) {
@@ -176,5 +205,5 @@ const doctorSlice = createSlice({
   },
 });
 
-export const { clearAppointments, clearError, clearHistory } = doctorSlice.actions;
+export const { clearAppointments, clearError, clearHistory, clearPatients } = doctorSlice.actions;
 export default doctorSlice.reducer;

@@ -81,8 +81,9 @@ router.get('/appointments', verifyToken, async (req, res) => {
 
     const doctorUserId = req.user.id || req.user.userId;
     
+    // UPDATED SELECT: Include doctorNotes, symptoms, diagnosis, ivfDetails
     const appointments = await Appointment.find({ doctorUserId })
-      .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes prescription prescriptions labTests dietPlan pharmacy')
+      .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
       .populate('userId', 'name email phone patientId')
       .sort({ appointmentDate: 1, appointmentTime: 1 })
       .lean();
@@ -185,9 +186,12 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
         appointment.prescription = result.url;
     }
 
-    // Update Status & Notes
+    // Update Status & Notes & Diagnosis
     if (status) appointment.status = status;
-    if (diagnosis) appointment.notes = diagnosis; 
+    if (diagnosis) {
+        appointment.diagnosis = diagnosis; // Save specifically to diagnosis field
+        appointment.notes = diagnosis;     // Also save to notes for general visibility
+    }
 
     // --- FIX: Robust Parsing for Complex Fields ---
     
