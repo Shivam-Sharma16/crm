@@ -12,6 +12,7 @@ const adminEntitiesRoutes = require('./routes/admin-entities.routes')
 const publicRoutes = require('./routes/public.routes')
 const uploadRoutes = require('./routes/upload.routes')
 const labRoutes = require('./routes/lab.routes');
+
 const app = express()
 
 // Connect to database

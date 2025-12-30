@@ -5,6 +5,7 @@ const multer = require('multer');
 const Appointment = require('../models/appointment.model');
 const Doctor = require('../models/doctor.model');
 const Service = require('../models/service.model'); 
+const LabReport = require('../models/labReport.model'); // Added LabReport Model
 const { verifyToken } = require('../middleware/auth.middleware');
 const imagekit = require('../utils/imagekit');
 
@@ -81,7 +82,6 @@ router.get('/appointments', verifyToken, async (req, res) => {
 
     const doctorUserId = req.user.id || req.user.userId;
     
-    // UPDATED SELECT: Include doctorNotes, symptoms, diagnosis, ivfDetails
     const appointments = await Appointment.find({ doctorUserId })
       .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
       .populate('userId', 'name email phone patientId')
@@ -133,17 +133,10 @@ router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
   }
 });
 
-// UPLOAD Prescription & Update Treatment Details (FIXED WITH LOGS)
+// UPLOAD Prescription & Update Treatment Details (Updated for LabReport)
 router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
   try {
-    // --- DEBUG LOG START ---
     console.log(`[DOCTOR] Updating Prescription for ID: ${req.params.id}`);
-    console.log(`[DOCTOR] Req Body Keys:`, Object.keys(req.body));
-    // Check raw values to see if they are arriving
-    console.log(`[DOCTOR] Raw LabTests:`, req.body.labTests);
-    console.log(`[DOCTOR] Raw DietPlan:`, req.body.dietPlan);
-    console.log(`[DOCTOR] Raw Pharmacy:`, req.body.pharmacy);
-    // ---------------------
 
     if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
 
@@ -151,7 +144,10 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     const appointmentId = req.params.id;
     const doctorUserId = req.user.id || req.user.userId;
 
-    const appointment = await Appointment.findOne({ _id: appointmentId, doctorUserId });
+    // Populate userId to get patient details for LabReport
+    const appointment = await Appointment.findOne({ _id: appointmentId, doctorUserId })
+      .populate('userId', 'patientId'); 
+
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
     // Handle File Upload
@@ -189,19 +185,16 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     // Update Status & Notes & Diagnosis
     if (status) appointment.status = status;
     if (diagnosis) {
-        appointment.diagnosis = diagnosis; // Save specifically to diagnosis field
-        appointment.notes = diagnosis;     // Also save to notes for general visibility
+        appointment.diagnosis = diagnosis;
+        appointment.notes = diagnosis;
     }
 
-    // --- FIX: Robust Parsing for Complex Fields ---
-    
-    // 1. Lab Tests
+    // 1. Lab Tests Parsing & Sync
+    let parsedLabTests = [];
     if (labTests) {
       try {
-        // If it's already an array (unlikely with FormData), use it. If string, parse it.
-        const parsed = typeof labTests === 'string' ? JSON.parse(labTests) : labTests;
-        appointment.labTests = Array.isArray(parsed) ? parsed : [];
-        console.log(`[DOCTOR] Parsed LabTests:`, appointment.labTests);
+        parsedLabTests = typeof labTests === 'string' ? JSON.parse(labTests) : labTests;
+        appointment.labTests = Array.isArray(parsedLabTests) ? parsedLabTests : [];
       } catch (e) { console.error("[DOCTOR] Error parsing labTests:", e); }
     }
 
@@ -211,7 +204,6 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
       try {
         const parsed = typeof dietData === 'string' ? JSON.parse(dietData) : dietData;
         appointment.dietPlan = Array.isArray(parsed) ? parsed : [];
-        console.log(`[DOCTOR] Parsed DietPlan:`, appointment.dietPlan);
       } catch (e) { console.error("[DOCTOR] Error parsing dietPlan:", e); }
     }
 
@@ -221,17 +213,49 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
         const parsedPharmacy = typeof pharmacy === 'string' ? JSON.parse(pharmacy) : pharmacy;
         if (Array.isArray(parsedPharmacy)) {
             appointment.pharmacy = parsedPharmacy.map(item => ({
-                medicineName: item.name || item.medicineName, // Map frontend 'name' to backend 'medicineName'
+                medicineName: item.name || item.medicineName,
                 frequency: item.frequency || '',
                 duration: item.duration || ''
             }));
-            console.log(`[DOCTOR] Parsed Pharmacy (${appointment.pharmacy.length} items)`);
         }
       } catch (e) { console.error("[DOCTOR] Error parsing pharmacy:", e); }
     }
 
     const savedDoc = await appointment.save();
-    console.log(`[DOCTOR] Save Successful. Updated Fields:`, Object.keys(savedDoc.toObject()));
+
+    // --- AUTOMATIC LAB REPORT CREATION ---
+    if (parsedLabTests && parsedLabTests.length > 0) {
+        try {
+            // Check if a report already exists for this appointment
+            const existingReport = await LabReport.findOne({ appointmentId: appointment._id });
+
+            if (existingReport) {
+                // Update existing request
+                existingReport.testNames = parsedLabTests;
+                // If previously completed, we might want to set back to PENDING if new tests added, 
+                // but usually better to keep as is or handle via specific status logic.
+                // For now, we update the list.
+                await existingReport.save();
+                console.log(`[LAB] Updated existing lab request for Appointment ${appointment._id}`);
+            } else {
+                // Create new request
+                await LabReport.create({
+                    appointmentId: appointment._id,
+                    patientId: appointment.userId?.patientId || 'N/A',
+                    userId: appointment.userId?._id,
+                    doctorId: doctorUserId,
+                    testNames: parsedLabTests,
+                    testStatus: 'PENDING',
+                    reportStatus: 'PENDING'
+                });
+                console.log(`[LAB] Created new lab request for Appointment ${appointment._id}`);
+            }
+        } catch (labError) {
+            console.error("[DOCTOR] Error syncing Lab Report:", labError);
+            // Don't fail the main request if lab sync fails, just log it
+        }
+    }
+    // -------------------------------------
     
     res.json({ success: true, message: 'Treatment plan updated', appointment: savedDoc });
   } catch (error) {
@@ -291,7 +315,7 @@ router.get('/patients', verifyToken, async (req, res) => {
         if (!uniquePatientsMap.has(patientId)) {
           uniquePatientsMap.set(patientId, {
             _id: app.userId._id,
-            patientId: app.userId.patientId || 'N/A', // Return persistent ID
+            patientId: app.userId.patientId || 'N/A',
             name: app.userId.name,
             email: app.userId.email,
             phone: app.userId.phone,
