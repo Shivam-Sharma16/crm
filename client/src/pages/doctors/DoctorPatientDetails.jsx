@@ -241,13 +241,21 @@ const DoctorPatientDetails = () => {
 
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
-  const getPrescriptionsList = () => {
-      if (appointment.prescriptions && appointment.prescriptions.length > 0) return appointment.prescriptions;
-      if (appointment.prescription) return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
-      return [];
+  // --- Logic to Separate Lab Reports from Doctor's Documents ---
+  const labReports = appointment.prescriptions?.filter(p => p.type === 'lab_report') || [];
+  
+  const getDoctorDocuments = () => {
+      const allDocs = appointment.prescriptions || [];
+      const docDocs = allDocs.filter(p => p.type !== 'lab_report');
+      
+      // Legacy support for single prescription field
+      if (docDocs.length === 0 && appointment.prescription) {
+          return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
+      }
+      return docDocs;
   };
 
-  const prescriptionsList = getPrescriptionsList();
+  const doctorDocuments = getDoctorDocuments();
   
   // Get patient identifier string
   const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
@@ -292,6 +300,29 @@ const DoctorPatientDetails = () => {
             )}
 
             <hr className="divider" />
+
+            {/* --- LAB RESULTS SECTION (NEW) --- */}
+            {labReports.length > 0 && (
+                <div className="lab-reports-section" style={{marginBottom: '30px'}}>
+                    <h3 style={{color: '#0284c7', display:'flex', alignItems:'center', gap:'10px'}}>
+                        🧪 Lab Results <span className="status-badge status-completed" style={{fontSize: '0.7rem'}}>New</span>
+                    </h3>
+                    <div className="prescriptions-list">
+                        {labReports.map((report, index) => (
+                            <div key={index} className="prescription-item" style={{borderColor: '#0284c7', backgroundColor: '#f0f9ff'}}>
+                                <a href={report.url} target="_blank" rel="noopener noreferrer" className="doc-link">
+                                    <div className="doc-icon">🔬</div>
+                                    <div className="doc-name" style={{color: '#0284c7'}}>{report.name}</div>
+                                </a>
+                                <div className="doc-date" style={{fontSize: '0.8rem', color: '#666', marginLeft: 'auto'}}>
+                                    {new Date(report.uploadedAt).toLocaleDateString()}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <hr className="divider" />
+                </div>
+            )}
 
             {/* --- TREATMENT PLAN --- */}
             <h3>Treatment Plan</h3>
@@ -353,14 +384,14 @@ const DoctorPatientDetails = () => {
             
             <hr className="divider" />
 
-            {/* Documents Section */}
+            {/* Documents Section (Doctor's Uploads) */}
             <div className="prescriptions-section">
                 <h3>Uploaded Documents</h3>
-                {prescriptionsList.length === 0 ? (
+                {doctorDocuments.length === 0 ? (
                     <p className="no-docs-text">No documents uploaded yet.</p>
                 ) : (
                     <div className="prescriptions-list">
-                        {prescriptionsList.map((item, index) => (
+                        {doctorDocuments.map((item, index) => (
                             <div key={item._id || index} className="prescription-item">
                                 <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
                                     <div className="doc-icon">📄</div>

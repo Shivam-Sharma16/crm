@@ -83,12 +83,7 @@ export const MainRoutes = () => {
         <Route path="/administrator/signup" element={<AdminSignup />} />
         <Route path="/administrator" element={<Administrator />} />
 
-        {/* --- Lab Routes --- */}
-        <Route path="/lab" element={
-            <ProtectedRoute allowedRoles={['lab']}>
-                <LabDashboard />
-            </ProtectedRoute>
-        } />
+       {/* --- Lab Routes --- */}
         <Route path="/lab/dashboard" element={
             <ProtectedRoute allowedRoles={['lab']}>
                 <LabDashboard />
@@ -97,6 +92,12 @@ export const MainRoutes = () => {
         <Route path="/lab/assigned-tests" element={
             <ProtectedRoute allowedRoles={['lab']}>
                 <AssignedTests />
+            </ProtectedRoute>
+        } />
+         <Route path="/lab/completed-reports" element={
+            <ProtectedRoute allowedRoles={['lab']}>
+                {/* Reusing AssignedTests but fetching completed status if you implement filters */}
+                <AssignedTests /> 
             </ProtectedRoute>
         } />
         {/* Add Pending/Completed/Profile similarly */}

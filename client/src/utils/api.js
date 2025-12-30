@@ -224,6 +224,30 @@ export const adminEntitiesAPI = {
   },
 };
 
+// --- NEW LAB API ---
+export const labAPI = {
+  // Get Lab Dashboard Stats
+  getStats: async () => {
+    const response = await apiClient.get('/api/lab/stats');
+    return response.data;
+  },
+  
+  // Get Assigned/Pending Requests
+  getRequests: async (status) => {
+    // status can be 'pending' or 'completed'
+    const response = await apiClient.get(`/api/lab/requests?status=${status || ''}`);
+    return response.data;
+  },
+
+  // Upload Lab Report
+  uploadReport: async (id, formData) => {
+    const response = await apiClient.post(`/api/lab/upload-report/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+};
+
 // Public API functions (no auth required)
 export const publicAPI = {
   // Get all active services

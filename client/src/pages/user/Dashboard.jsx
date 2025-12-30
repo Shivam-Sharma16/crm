@@ -3,18 +3,27 @@ import { useNavigate, Link } from 'react-router-dom';
 import './Dashboard.css';
 import './Appointment.css'; // Import shared styles for the details modal
 
-// --- Modal Component for Prescription Details ---
+// --- Modal Component for Prescription & Lab Details ---
 const PrescriptionModal = ({ appointment, onClose }) => {
   if (!appointment) return null;
 
-  // Helper to normalize pharmacy data (handles backend 'medicineName' vs frontend 'name')
+  // 1. Separate Lab Reports from Regular Prescriptions
+  const labReports = appointment.prescriptions?.filter(doc => doc.type === 'lab_report') || [];
+  const doctorPrescriptions = appointment.prescriptions?.filter(doc => doc.type !== 'lab_report') || [];
+  
+  // Handle legacy single prescription field
+  if (doctorPrescriptions.length === 0 && appointment.prescription) {
+      doctorPrescriptions.push({ url: appointment.prescription, name: 'Prescription File' });
+  }
+
+  // 2. Normalize Pharmacy Data
   const pharmacyItems = appointment.pharmacy?.map(p => ({
       name: p.medicineName || p.name,
       frequency: p.frequency || '-',
       duration: p.duration || '-'
   })) || [];
 
-  // Helper for diet data
+  // 3. Normalize Diet Data
   const dietItems = appointment.dietPlan || appointment.diet || [];
 
   return (
@@ -25,6 +34,7 @@ const PrescriptionModal = ({ appointment, onClose }) => {
           <button className="close-details-btn" onClick={onClose}>×</button>
         </div>
         <div className="details-body">
+            {/* Basic Info */}
             <div className="details-info-grid">
                 <div><strong>Doctor:</strong> {appointment.doctorName}</div>
                 <div><strong>Date:</strong> {new Date(appointment.appointmentDate).toLocaleDateString()}</div>
@@ -32,6 +42,7 @@ const PrescriptionModal = ({ appointment, onClose }) => {
             </div>
             <hr />
             
+            {/* Diagnosis / Notes */}
             {appointment.notes && (
                 <div className="detail-section">
                     <h4>Diagnosis / Notes</h4>
@@ -39,10 +50,17 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Lab Tests */}
+            {/* Lab Tests Section */}
             {appointment.labTests && appointment.labTests.length > 0 && (
                 <div className="detail-section">
-                    <h4>Recommended Lab Tests</h4>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '10px'}}>
+                        <h4 style={{margin:0}}>Recommended Lab Tests</h4>
+                        {labReports.length > 0 ? (
+                             <span className="status-badge status-completed" style={{fontSize: '0.75rem'}}>Results Ready</span>
+                        ) : (
+                             <span className="status-badge status-pending" style={{fontSize: '0.75rem'}}>Processing</span>
+                        )}
+                    </div>
                     <div className="tags-container">
                         {appointment.labTests.map((test, i) => (
                             <span key={i} className="detail-tag">{test}</span>
@@ -51,7 +69,21 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Pharmacy */}
+            {/* Lab Reports Downloads */}
+            {labReports.length > 0 && (
+                <div className="detail-section" style={{background: '#f0f9ff', padding: '15px', borderRadius: '8px', border: '1px solid #bae6fd'}}>
+                    <h4 style={{color: '#0284c7', marginTop: 0}}>🔬 Lab Results</h4>
+                    <div className="files-list">
+                        {labReports.map((doc, i) => (
+                             <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" className="file-link" style={{borderColor: '#0284c7', color:'#0284c7'}}>
+                                📄 {doc.name || 'Download Report'}
+                             </a>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Pharmacy Section */}
             {pharmacyItems.length > 0 && (
                 <div className="detail-section">
                     <h4>Prescribed Medications</h4>
@@ -76,7 +108,7 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-             {/* Diet */}
+             {/* Diet Section */}
              {dietItems.length > 0 && (
                 <div className="detail-section">
                     <h4>Dietary Recommendations</h4>
@@ -86,21 +118,16 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Documents */}
-            {(appointment.prescription || (appointment.prescriptions && appointment.prescriptions.length > 0)) && (
+            {/* Doctor Prescriptions Documents */}
+            {doctorPrescriptions.length > 0 && (
                 <div className="detail-section">
-                    <h4>Documents</h4>
+                    <h4>📝 Prescriptions</h4>
                     <div className="files-list">
-                        {appointment.prescriptions?.map((doc, i) => (
+                        {doctorPrescriptions.map((doc, i) => (
                              <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" className="file-link">
-                                📄 {doc.name || 'View Document'}
+                                📄 {doc.name || 'View Prescription'}
                              </a>
                         ))}
-                         {!appointment.prescriptions && appointment.prescription && (
-                             <a href={appointment.prescription} target="_blank" rel="noopener noreferrer" className="file-link">
-                                📄 View Prescription File
-                             </a>
-                        )}
                     </div>
                 </div>
             )}
