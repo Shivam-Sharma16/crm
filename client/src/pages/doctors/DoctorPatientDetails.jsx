@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
 import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
-import './Patient.css'; // Ensure this is imported
+import api from '../../utils/api'; // Direct API access for fetching labs
+import './Patient.css';
 
 // --- IVF RELATED DATA CONSTANTS ---
 const IVF_LAB_TESTS = [
@@ -65,7 +66,6 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -118,7 +118,6 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
         </div>
       )}
       
-      {/* Selected Tags Display */}
       <div className="multiselect-tags">
         {selected.map(item => (
           <span key={item} className="multiselect-tag">
@@ -144,21 +143,41 @@ const DoctorPatientDetails = () => {
   const [notes, setNotes] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  // --- STATES ---
+  // Treatment States
   const [selectedLabs, setSelectedLabs] = useState([]);
   const [selectedDiet, setSelectedDiet] = useState([]);
-  
-  // Pharmacy
   const [selectedMedNames, setSelectedMedNames] = useState([]); 
   const [pharmacyDetails, setPharmacyDetails] = useState([]);
 
+  // Lab Selection States
+  const [availableLabs, setAvailableLabs] = useState([]);
+  const [selectedLabId, setSelectedLabId] = useState('');
+
+  // 1. Fetch Available Labs on Mount
+  useEffect(() => {
+    const fetchLabs = async () => {
+        try {
+            // FIXED: Added '/api' prefix to the route to match server config
+            const res = await api.get('/api/doctor/labs-list');
+            if (res.data.success) {
+                setAvailableLabs(res.data.labs);
+            }
+        } catch (err) {
+            console.error("Failed to fetch labs list", err);
+        }
+    };
+    fetchLabs();
+  }, []);
+
+  // 2. Initialize Data from Appointment
   useEffect(() => {
     if (appointment) {
       setNotes(appointment.notes || '');
       if (appointment.labTests) setSelectedLabs(appointment.labTests);
       if (appointment.dietPlan || appointment.diet) setSelectedDiet(appointment.dietPlan || appointment.diet);
+      
+      // Initialize Pharmacy
       if (appointment.pharmacy) {
-        // Map backend structure (medicineName) to frontend structure (name)
         const mappedPharmacy = appointment.pharmacy.map(p => ({
             name: p.medicineName || p.name,
             frequency: p.frequency || '',
@@ -168,7 +187,14 @@ const DoctorPatientDetails = () => {
         setSelectedMedNames(mappedPharmacy.map(p => p.name));
       }
 
-      // Fetch History if we have a patientId (or userId)
+      // Initialize Selected Lab
+      if (appointment.labId) {
+         // Handle if populated (object) or raw ID (string)
+         const labVal = typeof appointment.labId === 'object' ? appointment.labId._id : appointment.labId;
+         setSelectedLabId(labVal);
+      }
+
+      // Fetch History
       const pId = appointment.patientId || appointment.userId?._id;
       if (pId) {
           dispatch(fetchPatientHistory(pId));
@@ -178,15 +204,11 @@ const DoctorPatientDetails = () => {
 
   const handleMedNameChange = (newNames) => {
     setSelectedMedNames(newNames);
-    
-    // Sync detailed array with names
     setPharmacyDetails(prev => {
-      // Keep existing details if name is still selected
-      const updated = newNames.map(name => {
+      return newNames.map(name => {
         const existing = prev.find(p => p.name === name);
         return existing || { name, frequency: '', duration: '' };
       });
-      return updated;
     });
   };
 
@@ -212,10 +234,15 @@ const DoctorPatientDetails = () => {
     formData.append('diagnosis', notes);
     formData.append('status', 'completed');
 
-    // Append JSON strings for complex arrays
+    // Append JSON strings for arrays
     formData.append('labTests', JSON.stringify(selectedLabs));
     formData.append('dietPlan', JSON.stringify(selectedDiet));
     formData.append('pharmacy', JSON.stringify(pharmacyDetails));
+    
+    // Append Selected Lab ID
+    if (selectedLabId) {
+        formData.append('labId', selectedLabId);
+    }
 
     try {
       await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
@@ -241,14 +268,14 @@ const DoctorPatientDetails = () => {
 
   if (!appointment) return <div className="patient-container">Appointment not found.</div>;
 
-  // --- Logic to Separate Lab Reports from Doctor's Documents ---
+  // Separate Lab Reports from Doctor Documents
   const labReports = appointment.prescriptions?.filter(p => p.type === 'lab_report') || [];
   
   const getDoctorDocuments = () => {
       const allDocs = appointment.prescriptions || [];
       const docDocs = allDocs.filter(p => p.type !== 'lab_report');
       
-      // Legacy support for single prescription field
+      // Legacy support
       if (docDocs.length === 0 && appointment.prescription) {
           return [{ _id: 'legacy', url: appointment.prescription, name: 'Previous Prescription' }];
       }
@@ -256,8 +283,6 @@ const DoctorPatientDetails = () => {
   };
 
   const doctorDocuments = getDoctorDocuments();
-  
-  // Get patient identifier string
   const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
 
   return (
@@ -301,7 +326,7 @@ const DoctorPatientDetails = () => {
 
             <hr className="divider" />
 
-            {/* --- LAB RESULTS SECTION (NEW) --- */}
+            {/* --- LAB RESULTS (Incoming from Lab) --- */}
             {labReports.length > 0 && (
                 <div className="lab-reports-section" style={{marginBottom: '30px'}}>
                     <h3 style={{color: '#0284c7', display:'flex', alignItems:'center', gap:'10px'}}>
@@ -327,6 +352,27 @@ const DoctorPatientDetails = () => {
             {/* --- TREATMENT PLAN --- */}
             <h3>Treatment Plan</h3>
             
+            {/* NEW: Lab Selection Dropdown */}
+            <div className="form-group-row" style={{marginBottom: '20px'}}>
+                <label className="multiselect-label" style={{display:'block', marginBottom:'8px', fontWeight:'600'}}>Assign to Lab</label>
+                <select 
+                    className="med-input" 
+                    style={{width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius:'8px', fontSize:'1rem'}}
+                    value={selectedLabId}
+                    onChange={(e) => setSelectedLabId(e.target.value)}
+                >
+                    <option value="">-- Select a Lab Center --</option>
+                    {availableLabs.map(lab => (
+                        <option key={lab._id} value={lab._id}>
+                             {lab.name} {lab.address ? `(${lab.address})` : ''}
+                        </option>
+                    ))}
+                </select>
+                <small style={{color: '#666', marginTop:'5px', display:'block'}}>
+                    Select the lab center where this test request should be routed.
+                </small>
+            </div>
+
             <div className="form-group-row">
                 <MultiSelectDropdown 
                     title="Lab Tests (IVF)" 

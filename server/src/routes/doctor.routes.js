@@ -1,10 +1,10 @@
-// server/src/routes/doctor.routes.js
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const Appointment = require('../models/appointment.model');
 const Doctor = require('../models/doctor.model');
-const Service = require('../models/service.model'); 
+const Service = require('../models/service.model');
+const Lab = require('../models/lab.model'); // Added Lab Model
 const LabReport = require('../models/labReport.model'); // Added LabReport Model for sync
 const { verifyToken } = require('../middleware/auth.middleware');
 const imagekit = require('../utils/imagekit');
@@ -14,6 +14,21 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
+});
+
+// --- NEW ROUTE: Get Available Labs for Dropdown ---
+router.get('/labs-list', verifyToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
+        
+        // Fetch only necessary fields for the dropdown
+        const labs = await Lab.find({}).select('name _id address');
+        
+        res.json({ success: true, labs });
+    } catch (error) {
+        console.error("Error fetching labs:", error);
+        res.status(500).json({ success: false, message: 'Error fetching labs' });
+    }
 });
 
 // GET Public Doctors List
@@ -83,8 +98,9 @@ router.get('/appointments', verifyToken, async (req, res) => {
     const doctorUserId = req.user.id || req.user.userId;
     
     const appointments = await Appointment.find({ doctorUserId })
-      .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
+      .select('userId patientId doctorId doctorUserId doctorName serviceId serviceName appointmentDate appointmentTime status paymentStatus amount notes doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy labId')
       .populate('userId', 'name email phone patientId')
+      .populate('labId', 'name') // Populate selected lab name
       .sort({ appointmentDate: 1, appointmentTime: 1 })
       .lean();
 
@@ -133,14 +149,15 @@ router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
   }
 });
 
-// UPLOAD Prescription & Update Treatment Details (Updated for LabReport Sync)
+// UPLOAD Prescription & Update Treatment Details (Updated for LabReport Sync & Lab Selection)
 router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
   try {
     console.log(`[DOCTOR] Updating Prescription for ID: ${req.params.id}`);
 
     if (req.user.role !== 'doctor') return res.status(403).json({ message: 'Access denied' });
 
-    const { status, diagnosis, labTests, diet, dietPlan, pharmacy } = req.body;
+    // Extract labId from the request body
+    const { status, diagnosis, labTests, diet, dietPlan, pharmacy, labId } = req.body;
     const appointmentId = req.params.id;
     const doctorUserId = req.user.id || req.user.userId;
 
@@ -150,7 +167,12 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
 
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
-    // --- 1. Handle File Upload ---
+    // --- 1. Update Lab Selection ---
+    if (labId) {
+        appointment.labId = labId;
+    }
+
+    // --- 2. Handle File Upload ---
     if (req.file) {
         console.log(`[DOCTOR] File uploaded: ${req.file.originalname}`);
         const result = await imagekit.upload({
@@ -184,14 +206,14 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
         appointment.prescription = result.url; // Update legacy field for backward compatibility
     }
 
-    // --- 2. Update Status & Notes ---
+    // --- 3. Update Status & Notes ---
     if (status) appointment.status = status;
     if (diagnosis) {
         appointment.diagnosis = diagnosis;
         appointment.notes = diagnosis;
     }
 
-    // --- 3. Parse & Save Complex Fields ---
+    // --- 4. Parse & Save Complex Fields ---
     let parsedLabTests = [];
     if (labTests) {
       try {
@@ -222,8 +244,8 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
 
     const savedDoc = await appointment.save();
 
-    // --- 4. AUTOMATIC LAB REPORT SYNC ---
-    // If lab tests were added, ensure a Lab Request exists
+    // --- 5. AUTOMATIC LAB REPORT SYNC ---
+    // If lab tests were added, ensure a Lab Request exists with the selected Lab ID
     if (parsedLabTests && parsedLabTests.length > 0) {
         try {
             const existingReport = await LabReport.findOne({ appointmentId: appointment._id });
@@ -231,6 +253,12 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
             if (existingReport) {
                 // Update existing request
                 existingReport.testNames = parsedLabTests;
+                
+                // Update assigned Lab if provided
+                if (labId) {
+                    existingReport.labId = labId;
+                }
+                
                 await existingReport.save();
                 console.log(`[LAB] Updated existing lab request for Appointment ${appointment._id}`);
             } else {
@@ -240,6 +268,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
                     patientId: appointment.userId?.patientId || 'N/A',
                     userId: appointment.userId?._id,
                     doctorId: doctorUserId,
+                    labId: labId || null, // Assign to the selected lab (or null if not selected)
                     testNames: parsedLabTests,
                     testStatus: 'PENDING',
                     reportStatus: 'PENDING'
@@ -248,7 +277,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
             }
         } catch (labError) {
             console.error("[DOCTOR] Error syncing Lab Report:", labError);
-            // We log but don't block the response, as the prescription save was successful
+            // We log but don't block the response
         }
     }
     
@@ -349,7 +378,8 @@ router.get('/patients/:patientId/history', verifyToken, async (req, res) => {
 
         const history = await Appointment.find(query)
             .sort({ appointmentDate: -1 })
-            .select('appointmentDate appointmentTime serviceName status notes prescription prescriptions labTests dietPlan pharmacy')
+            .select('appointmentDate appointmentTime serviceName status notes prescription prescriptions labTests dietPlan pharmacy labId')
+            .populate('labId', 'name')
             .lean();
 
         res.json({ success: true, history });

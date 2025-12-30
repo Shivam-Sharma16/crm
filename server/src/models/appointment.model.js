@@ -11,12 +11,12 @@ const pharmacyItemSchema = new mongoose.Schema({
     type: String, 
     default: '',
     trim: true
-  }, // e.g., "2 times a day"
+  },
   duration: { 
     type: String, 
     default: '',
     trim: true
-  }   // e.g., "5 days"
+  }
 }, { _id: false });
 
 const appointmentSchema = new mongoose.Schema({
@@ -44,22 +44,10 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Doctor name is required']
   },
-  serviceId: {
-    type: String,
-    required: false
-  },
-  serviceName: {
-    type: String,
-    required: false
-  },
-  appointmentDate: {
-    type: Date,
-    required: [true, 'Appointment date is required']
-  },
-  appointmentTime: {
-    type: String,
-    required: [true, 'Appointment time is required']
-  },
+  serviceId: { type: String, required: false },
+  serviceName: { type: String, required: false },
+  appointmentDate: { type: Date, required: [true, 'Appointment date is required'] },
+  appointmentTime: { type: String, required: [true, 'Appointment time is required'] },
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'completed', 'cancelled'],
@@ -71,75 +59,44 @@ const appointmentSchema = new mongoose.Schema({
     enum: ['pending', 'paid', 'refunded'],
     default: 'pending'
   },
-  amount: {
-    type: Number,
-    default: 0
-  },
+  amount: { type: Number, default: 0 },
   
-  // --- FIELDS THAT WERE PREVIOUSLY MISSING OR NOT SAVING ---
-  
-  // 1. General Notes
-  notes: {
-    type: String,
-    default: '' 
-  },
-  
-  // 2. Clinical Data
-  doctorNotes: {
-    type: String,
-    default: ''
-  },
-  symptoms: {
-    type: String,
-    default: ''
-  },
-  diagnosis: {
-    type: String,
-    default: ''
-  },
+  // Clinical Data
+  notes: { type: String, default: '' },
+  doctorNotes: { type: String, default: '' },
+  symptoms: { type: String, default: '' },
+  diagnosis: { type: String, default: '' },
 
-  // 3. Treatment Plans (Arrays)
-  labTests: [{
-    type: String,
-    trim: true
-  }],
-
-  dietPlan: [{
-    type: String,
-    trim: true
-  }],
-
-  pharmacy: [pharmacyItemSchema], // Maps to 'medicines' in frontend
-
-  // 4. IVF Specific Data (Flexible Object)
-  ivfDetails: {
-    type: mongoose.Schema.Types.Mixed, // Allows generic object structure
-    default: {}
+  // --- NEW FIELD: Selected Lab ---
+  labId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Lab',
+    default: null
   },
-  // -------------------------------------
+  // -------------------------------
 
-  // Legacy single prescription file
-  prescription: {
-    type: String,
-    default: ''
-  },
-  // Modern multiple prescription files support
+  labTests: [{ type: String, trim: true }],
+  dietPlan: [{ type: String, trim: true }],
+  pharmacy: [pharmacyItemSchema], 
+  ivfDetails: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+  // Files
+  prescription: { type: String, default: '' },
   prescriptions: [{
     url: { type: String, required: true },
     fileId: { type: String },
     name: { type: String },
-    uploadedAt: { type: Date, default: Date.now }
+    uploadedAt: { type: Date, default: Date.now },
+    type: { type: String } // 'doctor_prescription' or 'lab_report'
   }]
 }, {
   timestamps: true
 });
 
-// Compound index for checking availability
 appointmentSchema.index(
   { doctorId: 1, appointmentDate: 1, appointmentTime: 1 }, 
   { unique: true, partialFilterExpression: { status: { $ne: 'cancelled' } } }
 );
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);
-
 module.exports = Appointment;
