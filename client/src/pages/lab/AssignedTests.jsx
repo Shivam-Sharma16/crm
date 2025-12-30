@@ -1,13 +1,19 @@
-// client/src/pages/lab/AssignedTests.jsx
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchLabRequests, uploadLabReport, clearLabErrors } from '../../store/slices/labSlice';
-import '../user/Dashboard.css';
+import { FaSearch, FaFilter, FaUserInjured, FaUserMd, FaVial, FaFileMedical, FaCloudUploadAlt, FaTimes, FaCheckCircle, FaCalendarAlt, FaNotesMedical } from 'react-icons/fa';
+import './AssignedTests.css';
 
 const AssignedTests = () => {
   const dispatch = useAppDispatch();
   const { requests, loading, error, uploadSuccess } = useAppSelector((state) => state.lab);
-  const [uploadingId, setUploadingId] = useState(null);
+  
+  // Local State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRequest, setSelectedRequest] = useState(null); // For Modal
+  const [notes, setNotes] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     dispatch(fetchLabRequests('pending'));
@@ -15,165 +21,256 @@ const AssignedTests = () => {
 
   useEffect(() => {
     if (uploadSuccess) {
+        closeModal();
         const timer = setTimeout(() => dispatch(clearLabErrors()), 3000);
         return () => clearTimeout(timer);
     }
   }, [uploadSuccess, dispatch]);
 
-  const handleFileUpload = async (e, reportId) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // --- Filtering ---
+  const filteredRequests = requests.filter(req => 
+    req.userId?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    req.testNames?.some(test => test.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
-    setUploadingId(reportId);
+  // --- Handlers ---
+  const openModal = (request) => {
+    setSelectedRequest(request);
+    setNotes(request.notes || '');
+    setSelectedFile(null);
+  };
+
+  const closeModal = () => {
+    setSelectedRequest(null);
+    setNotes('');
+    setSelectedFile(null);
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setSelectedFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedRequest || !selectedFile) return;
+
     const formData = new FormData();
-    formData.append('reportFile', file);
+    formData.append('reportFile', selectedFile);
+    formData.append('notes', notes); // Appending notes to FormData
 
-    await dispatch(uploadLabReport({ id: reportId, formData }));
-    setUploadingId(null);
+    await dispatch(uploadLabReport({ id: selectedRequest._id, formData }));
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  // --- HELPER: Extract Prescription Link ---
+  // --- Helper: Get Prescription ---
   const getDoctorPrescription = (appointment) => {
     if (!appointment) return null;
-    
-    // 1. Check modern 'prescriptions' array (exclude lab reports)
-    if (appointment.prescriptions && appointment.prescriptions.length > 0) {
-        // Find documents that are NOT lab reports (so they are from doctor)
+    if (appointment.prescriptions?.length > 0) {
         const docDocs = appointment.prescriptions.filter(p => p.type !== 'lab_report');
-        if (docDocs.length > 0) {
-            // Return the most recent one
-            return docDocs[docDocs.length - 1]; 
-        }
+        if (docDocs.length > 0) return docDocs[docDocs.length - 1]; 
     }
-    
-    // 2. Fallback to legacy string field
     if (appointment.prescription) {
         return { url: appointment.prescription, name: 'Prescription File' };
     }
-    
     return null;
   };
 
-  return (
-    <div className="dashboard-page">
-      <div className="content-wrapper">
-        <section className="dashboard-header">
-          <div className="header-content">
-            <span className="badge">Work Queue</span>
-            <h1>Assigned Tests</h1>
-            {uploadSuccess && <div className="status-badge status-confirmed" style={{marginTop:'10px', display:'inline-block'}}>{uploadSuccess}</div>}
-            {error && <div className="status-badge status-cancelled" style={{marginTop:'10px', display:'inline-block'}}>{error}</div>}
-          </div>
-        </section>
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
 
-        {loading && !uploadingId ? (
-           <div className="loading-state"><div className="loading-spinner"></div><p>Loading requests...</p></div>
-        ) : (
-          <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))' }}>
-            {requests.length === 0 ? (
-                <div className="empty-state-small" style={{gridColumn: '1/-1'}}>
-                    <div className="empty-icon">✓</div>
-                    <p>No pending tests found. Good job!</p>
-                </div>
-            ) : (
-                requests.map((req) => {
-                    // Extract prescription using helper
-                    const docPrescription = getDoctorPrescription(req.appointmentId);
-                    
-                    return (
-                        <div key={req._id} className="dashboard-item animate-on-scroll slide-up">
-                            <div className="item-header">
-                                <span className="item-id">Patient: {req.userId?.name || 'Unknown'}</span>
-                                <span className="status-badge status-pending">Pending</span>
-                            </div>
-                            
-                            <div className="item-body">
-                                <div className="item-details">
-                                    <p><strong>Tests:</strong> <span style={{color: '#d97706', fontWeight: 'bold'}}>{req.testNames?.join(', ')}</span></p>
-                                    <p><strong>Doctor:</strong> {req.doctorId?.name}</p>
-                                    <p><strong>Date:</strong> {formatDate(req.appointmentId?.appointmentDate)}</p>
-                                    <p><strong>Patient Info:</strong> {req.userId?.gender || '-'}, {req.userId?.age || '-'} yrs</p>
-                                    
-                                    {/* --- RENDER PRESCRIPTION LINK --- */}
-                                    {docPrescription ? (
-                                        <div style={{
-                                            marginTop: '12px', 
-                                            padding: '10px', 
-                                            background: '#f0f9ff', 
-                                            borderRadius: '8px', 
-                                            border: '1px solid #bae6fd'
-                                        }}>
-                                            <p style={{margin: '0 0 5px 0', fontSize: '0.8rem', color: '#0284c7', fontWeight: '600'}}>
-                                                Doctor's Prescription:
-                                            </p>
-                                            <a 
-                                                href={docPrescription.url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                style={{
-                                                    display: 'flex', 
-                                                    alignItems: 'center', 
-                                                    gap: '8px', 
-                                                    textDecoration: 'none', 
-                                                    color: '#0369a1', 
-                                                    fontWeight: '500', 
-                                                    fontSize: '0.9rem'
-                                                }}
-                                            >
-                                                <span style={{fontSize: '1.2rem'}}>📄</span> 
-                                                <span style={{textDecoration: 'underline'}}>{docPrescription.name || 'View Document'}</span>
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <div style={{marginTop: '10px', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic'}}>
-                                            No prescription file attached
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                <div className="action-area" style={{marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee'}}>
-                                    {uploadingId === req._id ? (
-                                        <button className="auth-button" style={{width: '100%', opacity: 0.7}} disabled>Uploading...</button>
-                                    ) : (
-                                        <>
-                                            <input
-                                                type="file"
-                                                id={`file-${req._id}`}
-                                                style={{ display: 'none' }}
-                                                onChange={(e) => handleFileUpload(e, req._id)}
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                            />
-                                            <label 
-                                                htmlFor={`file-${req._id}`} 
-                                                className="view-presc-btn" 
-                                                style={{
-                                                    cursor: 'pointer', 
-                                                    display: 'block', 
-                                                    textAlign:'center', 
-                                                    background: '#14C38E', 
-                                                    color: 'white', 
-                                                    border: 'none',
-                                                    padding: '10px'
-                                                }}
-                                            >
-                                                📤 Upload Results
-                                            </label>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })
-            )}
+  return (
+    <div className="lab-page-container">
+      {/* --- Header Section --- */}
+      <header className="lab-header">
+        <div className="header-title">
+          <h1><FaVial className="header-icon"/> Lab Requests</h1>
+          <p>Manage pending tests and upload diagnostic reports</p>
+        </div>
+        
+        <div className="header-actions">
+          <div className="search-box">
+            <FaSearch className="search-icon"/>
+            <input 
+              type="text" 
+              placeholder="Search patient or test..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-        )}
-      </div>
+          <div className="filter-badge">
+            <FaFilter /> {filteredRequests.length} Pending
+          </div>
+        </div>
+      </header>
+
+      {/* --- Status Messages --- */}
+      {uploadSuccess && <div className="lab-alert success"><FaCheckCircle/> {uploadSuccess}</div>}
+      {error && <div className="lab-alert error"><FaTimes/> {error}</div>}
+
+      {/* --- Content Grid --- */}
+      {loading && !selectedRequest ? (
+         <div className="lab-loading"><div className="spinner"></div><p>Fetching requests...</p></div>
+      ) : (
+        <div className="lab-grid">
+          {filteredRequests.length === 0 ? (
+            <div className="lab-empty-state">
+                <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" alt="No Tasks" />
+                <h3>All Caught Up!</h3>
+                <p>There are no pending lab tests assigned to you right now.</p>
+            </div>
+          ) : (
+            filteredRequests.map((req) => {
+                const prescription = getDoctorPrescription(req.appointmentId);
+                return (
+                    <div key={req._id} className="lab-card">
+                        <div className="card-header">
+                            <span className="patient-id">ID: #{req.patientId || 'N/A'}</span>
+                            <span className="date-badge"><FaCalendarAlt/> {formatDate(req.appointmentId?.appointmentDate)}</span>
+                        </div>
+                        
+                        <div className="card-body">
+                            <div className="info-row">
+                                <div className="info-group">
+                                    <label><FaUserInjured/> Patient</label>
+                                    <h4>{req.userId?.name}</h4>
+                                    <span>{req.userId?.gender}, {req.userId?.age} yrs</span>
+                                </div>
+                                <div className="info-group">
+                                    <label><FaUserMd/> Doctor</label>
+                                    <h4>{req.doctorId?.name}</h4>
+                                </div>
+                            </div>
+
+                            <div className="test-list">
+                                <label>Prescribed Tests:</label>
+                                <div className="tags">
+                                    {req.testNames?.map((test, i) => (
+                                        <span key={i} className="test-tag">{test}</span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {prescription && (
+                                <a href={prescription.url} target="_blank" rel="noreferrer" className="prescription-link">
+                                    <FaFileMedical/> View Prescription
+                                </a>
+                            )}
+                        </div>
+
+                        <div className="card-footer">
+                            <button className="btn-process" onClick={() => openModal(req)}>
+                                Process & Upload Report
+                            </button>
+                        </div>
+                    </div>
+                );
+            })
+          )}
+        </div>
+      )}
+
+      {/* --- Upload Modal --- */}
+      {selectedRequest && (
+        <div className="lab-modal-overlay" onClick={closeModal}>
+          <div className="lab-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Upload Lab Report</h2>
+              <button className="close-btn" onClick={closeModal}><FaTimes/></button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="modal-content">
+              {/* Summary Section */}
+              <div className="modal-summary">
+                <div className="summary-item">
+                    <span>Patient:</span>
+                    <strong>{selectedRequest.userId?.name}</strong>
+                </div>
+                <div className="summary-item">
+                    <span>Tests:</span>
+                    <strong>{selectedRequest.testNames?.join(', ')}</strong>
+                </div>
+              </div>
+
+              {/* Input: Notes */}
+              <div className="form-group">
+                <label><FaNotesMedical/> Lab Technician Notes</label>
+                <textarea 
+                  value={notes} 
+                  onChange={(e) => setNotes(e.target.value)} 
+                  placeholder="Enter observations, test result summaries, or internal notes..."
+                  rows="3"
+                ></textarea>
+              </div>
+
+              {/* Input: File Upload (Drag & Drop) */}
+              <div className="form-group">
+                <label><FaCloudUploadAlt/> Report File (PDF/Image)</label>
+                <div 
+                    className={`drop-zone ${dragActive ? 'active' : ''} ${selectedFile ? 'has-file' : ''}`}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                >
+                    <input 
+                        type="file" 
+                        id="report-file" 
+                        accept=".pdf,.jpg,.png,.jpeg" 
+                        onChange={handleFileChange}
+                        hidden
+                    />
+                    
+                    {selectedFile ? (
+                        <div className="file-info">
+                            <FaFileMedical className="file-icon"/>
+                            <span>{selectedFile.name}</span>
+                            <button type="button" onClick={() => setSelectedFile(null)} className="remove-file">Change</button>
+                        </div>
+                    ) : (
+                        <div className="upload-prompt">
+                            <FaCloudUploadAlt className="upload-icon-large"/>
+                            <p>Drag & Drop file here or <label htmlFor="report-file">Browse</label></p>
+                            <span>Supports PDF, JPG, PNG</span>
+                        </div>
+                    )}
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button>
+                <button 
+                    type="submit" 
+                    className={`btn-submit ${loading ? 'loading' : ''}`}
+                    disabled={!selectedFile || loading}
+                >
+                    {loading ? 'Uploading...' : 'Confirm Upload'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

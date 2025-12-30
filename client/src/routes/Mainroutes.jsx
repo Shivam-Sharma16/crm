@@ -38,6 +38,7 @@ import Administrator from '../pages/administration/Administrator';
 //lab
 import LabDashboard from '../pages/lab/LabDashboard';
 import AssignedTests from '../pages/lab/AssignedTests';
+import CompletedReports from '../pages/lab/CompletedReports';
 
 export const MainRoutes = () => {
   return (
@@ -97,7 +98,7 @@ export const MainRoutes = () => {
          <Route path="/lab/completed-reports" element={
             <ProtectedRoute allowedRoles={['lab']}>
                 {/* Reusing AssignedTests but fetching completed status if you implement filters */}
-                <AssignedTests /> 
+                <CompletedReports /> 
             </ProtectedRoute>
         } />
         {/* Add Pending/Completed/Profile similarly */}
