@@ -5,7 +5,7 @@ const multer = require('multer');
 const Appointment = require('../models/appointment.model');
 const Doctor = require('../models/doctor.model');
 const Service = require('../models/service.model'); 
-const LabReport = require('../models/labReport.model'); // Added LabReport Model
+const LabReport = require('../models/labReport.model'); // Added LabReport Model for sync
 const { verifyToken } = require('../middleware/auth.middleware');
 const imagekit = require('../utils/imagekit');
 
@@ -133,7 +133,7 @@ router.patch('/appointments/:id/cancel', verifyToken, async (req, res) => {
   }
 });
 
-// UPLOAD Prescription & Update Treatment Details (Updated for LabReport)
+// UPLOAD Prescription & Update Treatment Details (Updated for LabReport Sync)
 router.patch('/appointments/:id/prescription', verifyToken, upload.single('prescriptionFile'), async (req, res) => {
   try {
     console.log(`[DOCTOR] Updating Prescription for ID: ${req.params.id}`);
@@ -144,13 +144,13 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
     const appointmentId = req.params.id;
     const doctorUserId = req.user.id || req.user.userId;
 
-    // Populate userId to get patient details for LabReport
+    // Populate userId to get patient details for automatic LabReport creation
     const appointment = await Appointment.findOne({ _id: appointmentId, doctorUserId })
       .populate('userId', 'patientId'); 
 
     if (!appointment) return res.status(404).json({ message: 'Appointment not found' });
 
-    // Handle File Upload
+    // --- 1. Handle File Upload ---
     if (req.file) {
         console.log(`[DOCTOR] File uploaded: ${req.file.originalname}`);
         const result = await imagekit.upload({
@@ -163,7 +163,7 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
 
         if (!appointment.prescriptions) appointment.prescriptions = [];
 
-        // Migrate legacy
+        // Migrate legacy single field if exists
         if (appointment.prescription && appointment.prescriptions.length === 0) {
              appointment.prescriptions.push({
                  url: appointment.prescription,
@@ -172,24 +172,26 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
              });
         }
         
+        // Add new file with specific type so Lab knows it's from Doctor
         appointment.prescriptions.push({
             url: result.url,
             fileId: result.fileId,
             name: req.file.originalname,
-            uploadedAt: new Date()
+            uploadedAt: new Date(),
+            type: 'doctor_prescription' 
         });
         
-        appointment.prescription = result.url;
+        appointment.prescription = result.url; // Update legacy field for backward compatibility
     }
 
-    // Update Status & Notes & Diagnosis
+    // --- 2. Update Status & Notes ---
     if (status) appointment.status = status;
     if (diagnosis) {
         appointment.diagnosis = diagnosis;
         appointment.notes = diagnosis;
     }
 
-    // 1. Lab Tests Parsing & Sync
+    // --- 3. Parse & Save Complex Fields ---
     let parsedLabTests = [];
     if (labTests) {
       try {
@@ -198,21 +200,18 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
       } catch (e) { console.error("[DOCTOR] Error parsing labTests:", e); }
     }
 
-    // 2. Diet Plan
-    const dietData = dietPlan || diet;
-    if (dietData) {
+    if (dietPlan || diet) {
       try {
-        const parsed = typeof dietData === 'string' ? JSON.parse(dietData) : dietData;
-        appointment.dietPlan = Array.isArray(parsed) ? parsed : [];
+        const d = dietPlan || diet;
+        appointment.dietPlan = typeof d === 'string' ? JSON.parse(d) : (Array.isArray(d) ? d : []);
       } catch (e) { console.error("[DOCTOR] Error parsing dietPlan:", e); }
     }
 
-    // 3. Pharmacy
     if (pharmacy) {
       try {
-        const parsedPharmacy = typeof pharmacy === 'string' ? JSON.parse(pharmacy) : pharmacy;
-        if (Array.isArray(parsedPharmacy)) {
-            appointment.pharmacy = parsedPharmacy.map(item => ({
+        const p = typeof pharmacy === 'string' ? JSON.parse(pharmacy) : pharmacy;
+        if (Array.isArray(p)) {
+            appointment.pharmacy = p.map(item => ({
                 medicineName: item.name || item.medicineName,
                 frequency: item.frequency || '',
                 duration: item.duration || ''
@@ -223,18 +222,15 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
 
     const savedDoc = await appointment.save();
 
-    // --- AUTOMATIC LAB REPORT CREATION ---
+    // --- 4. AUTOMATIC LAB REPORT SYNC ---
+    // If lab tests were added, ensure a Lab Request exists
     if (parsedLabTests && parsedLabTests.length > 0) {
         try {
-            // Check if a report already exists for this appointment
             const existingReport = await LabReport.findOne({ appointmentId: appointment._id });
 
             if (existingReport) {
                 // Update existing request
                 existingReport.testNames = parsedLabTests;
-                // If previously completed, we might want to set back to PENDING if new tests added, 
-                // but usually better to keep as is or handle via specific status logic.
-                // For now, we update the list.
                 await existingReport.save();
                 console.log(`[LAB] Updated existing lab request for Appointment ${appointment._id}`);
             } else {
@@ -252,10 +248,9 @@ router.patch('/appointments/:id/prescription', verifyToken, upload.single('presc
             }
         } catch (labError) {
             console.error("[DOCTOR] Error syncing Lab Report:", labError);
-            // Don't fail the main request if lab sync fails, just log it
+            // We log but don't block the response, as the prescription save was successful
         }
     }
-    // -------------------------------------
     
     res.json({ success: true, message: 'Treatment plan updated', appointment: savedDoc });
   } catch (error) {

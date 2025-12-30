@@ -1,3 +1,4 @@
+// client/src/pages/lab/AssignedTests.jsx
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchLabRequests, uploadLabReport, clearLabErrors } from '../../store/slices/labSlice';
@@ -12,7 +13,6 @@ const AssignedTests = () => {
     dispatch(fetchLabRequests('pending'));
   }, [dispatch]);
 
-  // Auto-clear success message after 3 seconds
   useEffect(() => {
     if (uploadSuccess) {
         const timer = setTimeout(() => dispatch(clearLabErrors()), 3000);
@@ -37,6 +37,28 @@ const AssignedTests = () => {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  // --- HELPER: Extract Prescription Link ---
+  const getDoctorPrescription = (appointment) => {
+    if (!appointment) return null;
+    
+    // 1. Check modern 'prescriptions' array (exclude lab reports)
+    if (appointment.prescriptions && appointment.prescriptions.length > 0) {
+        // Find documents that are NOT lab reports (so they are from doctor)
+        const docDocs = appointment.prescriptions.filter(p => p.type !== 'lab_report');
+        if (docDocs.length > 0) {
+            // Return the most recent one
+            return docDocs[docDocs.length - 1]; 
+        }
+    }
+    
+    // 2. Fallback to legacy string field
+    if (appointment.prescription) {
+        return { url: appointment.prescription, name: 'Prescription File' };
+    }
+    
+    return null;
+  };
+
   return (
     <div className="dashboard-page">
       <div className="content-wrapper">
@@ -59,42 +81,95 @@ const AssignedTests = () => {
                     <p>No pending tests found. Good job!</p>
                 </div>
             ) : (
-                requests.map((req) => (
-                <div key={req._id} className="dashboard-item animate-on-scroll slide-up">
-                    <div className="item-header">
-                        <span className="item-id">Patient: {req.userId?.name || 'Unknown'}</span>
-                        <span className="status-badge status-pending">Pending</span>
-                    </div>
+                requests.map((req) => {
+                    // Extract prescription using helper
+                    const docPrescription = getDoctorPrescription(req.appointmentId);
                     
-                    <div className="item-body">
-                        <div className="item-details">
-                            <p><strong>Tests:</strong> {req.testNames?.join(', ')}</p>
-                            <p><strong>Doctor:</strong> {req.doctorId?.name}</p>
-                            <p><strong>Date:</strong> {formatDate(req.appointmentId?.appointmentDate)}</p>
-                            <p><strong>Patient Info:</strong> {req.userId?.gender || '-'}, {req.userId?.age || '-'} yrs</p>
+                    return (
+                        <div key={req._id} className="dashboard-item animate-on-scroll slide-up">
+                            <div className="item-header">
+                                <span className="item-id">Patient: {req.userId?.name || 'Unknown'}</span>
+                                <span className="status-badge status-pending">Pending</span>
+                            </div>
+                            
+                            <div className="item-body">
+                                <div className="item-details">
+                                    <p><strong>Tests:</strong> <span style={{color: '#d97706', fontWeight: 'bold'}}>{req.testNames?.join(', ')}</span></p>
+                                    <p><strong>Doctor:</strong> {req.doctorId?.name}</p>
+                                    <p><strong>Date:</strong> {formatDate(req.appointmentId?.appointmentDate)}</p>
+                                    <p><strong>Patient Info:</strong> {req.userId?.gender || '-'}, {req.userId?.age || '-'} yrs</p>
+                                    
+                                    {/* --- RENDER PRESCRIPTION LINK --- */}
+                                    {docPrescription ? (
+                                        <div style={{
+                                            marginTop: '12px', 
+                                            padding: '10px', 
+                                            background: '#f0f9ff', 
+                                            borderRadius: '8px', 
+                                            border: '1px solid #bae6fd'
+                                        }}>
+                                            <p style={{margin: '0 0 5px 0', fontSize: '0.8rem', color: '#0284c7', fontWeight: '600'}}>
+                                                Doctor's Prescription:
+                                            </p>
+                                            <a 
+                                                href={docPrescription.url} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: '8px', 
+                                                    textDecoration: 'none', 
+                                                    color: '#0369a1', 
+                                                    fontWeight: '500', 
+                                                    fontSize: '0.9rem'
+                                                }}
+                                            >
+                                                <span style={{fontSize: '1.2rem'}}>📄</span> 
+                                                <span style={{textDecoration: 'underline'}}>{docPrescription.name || 'View Document'}</span>
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <div style={{marginTop: '10px', fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic'}}>
+                                            No prescription file attached
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="action-area" style={{marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #eee'}}>
+                                    {uploadingId === req._id ? (
+                                        <button className="auth-button" style={{width: '100%', opacity: 0.7}} disabled>Uploading...</button>
+                                    ) : (
+                                        <>
+                                            <input
+                                                type="file"
+                                                id={`file-${req._id}`}
+                                                style={{ display: 'none' }}
+                                                onChange={(e) => handleFileUpload(e, req._id)}
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                            />
+                                            <label 
+                                                htmlFor={`file-${req._id}`} 
+                                                className="view-presc-btn" 
+                                                style={{
+                                                    cursor: 'pointer', 
+                                                    display: 'block', 
+                                                    textAlign:'center', 
+                                                    background: '#14C38E', 
+                                                    color: 'white', 
+                                                    border: 'none',
+                                                    padding: '10px'
+                                                }}
+                                            >
+                                                📤 Upload Results
+                                            </label>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div className="action-area" style={{marginTop: '15px'}}>
-                            {uploadingId === req._id ? (
-                                <button className="auth-button" disabled>Uploading...</button>
-                            ) : (
-                                <>
-                                    <input
-                                        type="file"
-                                        id={`file-${req._id}`}
-                                        style={{ display: 'none' }}
-                                        onChange={(e) => handleFileUpload(e, req._id)}
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                    />
-                                    <label htmlFor={`file-${req._id}`} className="view-presc-btn" style={{cursor: 'pointer', display: 'block', textAlign:'center'}}>
-                                        📤 Upload Report
-                                    </label>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                ))
+                    );
+                })
             )}
           </div>
         )}
