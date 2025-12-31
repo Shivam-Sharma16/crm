@@ -1,4 +1,3 @@
-// client/src/components/Navbar.jsx
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAuth } from '../store/hooks';
@@ -34,8 +33,8 @@ const Navbar = () => {
             Home
           </NavLink>
          
-          {/* Show user links only for regular users (not admin, not doctor, not lab, NOT PHARMACY) */}
-          {user?.role !== 'admin' && user?.role !== 'doctor' && user?.role !== 'lab' && user?.role !== 'pharmacy' && (
+          {/* Show user links only for regular users (not admin, not doctor, not lab, NOT PHARMACY, NOT RECEPTION) */}
+          {user?.role !== 'admin' && user?.role !== 'doctor' && user?.role !== 'lab' && user?.role !== 'pharmacy' && user?.role !== 'reception' && (
             <>
               <NavLink 
                 to="/services" 
@@ -128,6 +127,16 @@ const Navbar = () => {
                 Completed Reports
               </NavLink>
             </>
+          )}
+
+          {/* Show Reception links only for Reception users */}
+          {user?.role === 'reception' && isAuthenticated && (
+            <NavLink 
+              to="/reception/dashboard" 
+              className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}
+            >
+              Dashboard
+            </NavLink>
           )}
 
           {/* Show admin links only for admins */}

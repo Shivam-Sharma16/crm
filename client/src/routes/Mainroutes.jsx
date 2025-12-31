@@ -1,4 +1,3 @@
-// client/src/routes/Mainroutes.jsx
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
@@ -40,9 +39,12 @@ import LabDashboard from '../pages/lab/LabDashboard';
 import AssignedTests from '../pages/lab/AssignedTests';
 import CompletedReports from '../pages/lab/CompletedReports';
 
-// Pharmacy Management Pages (New)
+// Pharmacy Management Pages
 import PharmacyInventory from '../pages/pharmacy/PharmacyInventory';
 import PharmacyOrders from '../pages/pharmacy/PharmacyOrders';
+
+// Reception Pages (New)
+import ReceptionDashboard from '../pages/reception/ReceptionDashboard';
 
 export const MainRoutes = () => {
   return (
@@ -111,6 +113,13 @@ export const MainRoutes = () => {
         <Route path="/pharmacy/orders" element={
             <ProtectedRoute allowedRoles={['pharmacy']}>
                 <PharmacyOrders />
+            </ProtectedRoute>
+        } />
+
+        {/* --- Reception Routes --- */}
+        <Route path="/reception/dashboard" element={
+            <ProtectedRoute allowedRoles={['reception']}>
+                <ReceptionDashboard />
             </ProtectedRoute>
         } />
       </Routes>
