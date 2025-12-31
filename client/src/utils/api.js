@@ -27,11 +27,8 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized - clear token and user from localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      
-      // Dispatch logout action if store is available (synchronous check)
       try {
         const { getStoreRef } = require('../store/storeRef');
         const store = getStoreRef();
@@ -39,15 +36,14 @@ apiClient.interceptors.response.use(
           const { logout } = require('../store/slices/authSlice');
           store.dispatch(logout());
         }
-      } catch (err) {
-        // Store not available yet
-      }
+      } catch (err) {}
     }
     return Promise.reject(error);
   }
 );
 
-// Auth API functions
+
+
 export const authAPI = {
   login: async (email, password) => {
     const response = await apiClient.post('/api/auth/login', { email, password });
@@ -59,7 +55,6 @@ export const authAPI = {
   },
 };
 
-// Admin Auth API functions
 export const adminAPI = {
   login: async (email, password) => {
     const response = await apiClient.post('/api/admin/login', { email, password });
@@ -87,7 +82,6 @@ export const adminAPI = {
   },
 };
 
-// Admin Entities API functions
 export const adminEntitiesAPI = {
   getDoctors: async () => {
     const response = await apiClient.get('/api/admin-entities/doctors');
@@ -175,10 +169,9 @@ export const adminEntitiesAPI = {
   },
 };
 
-// --- RECEPTION API (UPDATED FOR NEW ROUTES) ---
+// --- RECEPTION API (ADDED THIS) ---
 export const receptionAPI = {
   getAllAppointments: async () => {
-    console.log("[API] Calling GET /api/reception/appointments");
     const response = await apiClient.get('/api/reception/appointments');
     return response.data;
   },
@@ -192,7 +185,6 @@ export const receptionAPI = {
   }
 };
 
-// Lab API
 export const labAPI = {
   getStats: async () => {
     const response = await apiClient.get('/api/lab/stats');
@@ -210,7 +202,6 @@ export const labAPI = {
   }
 };
 
-// Public API functions
 export const publicAPI = {
   getServices: async () => {
     const response = await apiClient.get('/api/public/services');
@@ -223,7 +214,6 @@ export const publicAPI = {
   },
 };
 
-// Upload API functions
 export const uploadAPI = {
   uploadImages: async (formData) => {
     const response = await apiClient.post('/api/upload/images', formData);

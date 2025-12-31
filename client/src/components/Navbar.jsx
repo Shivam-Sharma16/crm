@@ -20,7 +20,7 @@ const Navbar = () => {
         {/* Logo/Brand */}
         <NavLink to="/" className="navbar-brand">
           <span className="brand-icon">🏥</span>
-          <span className="brand-text">MediCare Prime</span>
+          <span className="brand-text">Krisna IVF</span>
         </NavLink>
 
         {/* Navigation Links */}

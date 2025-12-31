@@ -12,7 +12,7 @@ const adminEntitiesRoutes = require('./routes/admin-entities.routes')
 const publicRoutes = require('./routes/public.routes')
 const uploadRoutes = require('./routes/upload.routes')
 const labRoutes = require('./routes/lab.routes')
-const receptionRoutes = require('./routes/reception.routes') // <--- IMPORT THIS
+const receptionRoutes = require('./routes/reception.routes') // <--- 1. IMPORT THIS
 
 const app = express()
 
@@ -40,7 +40,7 @@ app.use('/api/admin-entities', adminEntitiesRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/lab', labRoutes);
-app.use('/api/reception', receptionRoutes); // <--- MOUNT THIS
+app.use('/api/reception', receptionRoutes); // <--- 2. MOUNT THIS (Use exact path)
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -12,31 +12,31 @@ const ReceptionDashboard = () => {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
-  const [rescheduleError, setRescheduleError] = useState('');
 
   useEffect(() => {
     fetchAppointments();
   }, []);
 
   const fetchAppointments = async () => {
+    console.log("Dashboard: Requesting appointments...");
     setLoading(true);
     setError(null);
     try {
       const response = await receptionAPI.getAllAppointments();
+      console.log("Dashboard: Success", response);
       if (response.success) {
         setAppointments(response.appointments);
       } else {
-        setError('Failed to load appointments.');
+        setError('Server responded, but failed to load data.');
       }
     } catch (err) {
-      console.error("Dashboard Fetch Error:", err);
-      // More friendly error message
+      console.error("Dashboard Error:", err);
       if (err.response?.status === 404) {
-        setError('Error: Reception API not found. Please check backend routes.');
+        setError('404 Error: The Reception API is unreachable. (Check app.js route mounting)');
       } else if (err.response?.status === 403) {
-        setError('Access Denied: You do not have permission to view these appointments.');
+        setError('403 Error: Access Denied. You are not logged in as "reception".');
       } else {
-        setError('Failed to fetch appointments. Server may be down.');
+        setError(`Error: ${err.message}`);
       }
     } finally {
       setLoading(false);
@@ -44,167 +44,93 @@ const ReceptionDashboard = () => {
   };
 
   const handleCancel = async (id) => {
-    if (window.confirm('Are you sure you want to cancel this appointment?')) {
+    if (window.confirm('Are you sure?')) {
       try {
         await receptionAPI.cancelAppointment(id);
-        fetchAppointments(); // Refresh list to show updated status
+        fetchAppointments(); // Refresh
       } catch (err) {
-        alert(err.response?.data?.message || 'Error cancelling appointment');
+        alert('Failed to cancel: ' + (err.response?.data?.message || err.message));
       }
     }
   };
 
-  const openRescheduleModal = (apt) => {
-    setSelectedAppointment(apt);
-    // Format date for HTML input (YYYY-MM-DD)
-    const dateStr = new Date(apt.appointmentDate).toISOString().split('T')[0];
-    setNewDate(dateStr);
-    setNewTime(apt.appointmentTime);
-    setShowModal(true);
-    setRescheduleError('');
-  };
-
   const handleRescheduleSubmit = async (e) => {
     e.preventDefault();
-    setRescheduleError('');
-    
     try {
       await receptionAPI.rescheduleAppointment(selectedAppointment._id, newDate, newTime);
       setShowModal(false);
-      setSelectedAppointment(null);
       fetchAppointments();
-      alert('Appointment rescheduled successfully');
+      alert('Rescheduled successfully');
     } catch (err) {
-      setRescheduleError(err.response?.data?.message || 'Failed to reschedule');
+      alert('Failed to reschedule: ' + (err.response?.data?.message || err.message));
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
-  };
-
-  if (loading && appointments.length === 0) {
-    return <div className="reception-loading">Loading appointments...</div>;
-  }
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '-';
 
   return (
     <div className="reception-dashboard">
       <div className="dashboard-header">
         <h1>Reception Dashboard</h1>
         <button className="refresh-btn" onClick={fetchAppointments}>
-            {loading ? 'Refreshing...' : '🔄 Refresh'}
+           {loading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message" style={{background: '#ffebee', color: '#c62828', padding: '1rem', marginBottom: '1rem'}}>{error}</div>}
 
       <div className="table-container">
         <table className="reception-table">
           <thead>
             <tr>
               <th>Patient</th>
-              <th>ID</th>
               <th>Doctor</th>
-              <th>Service</th>
-              <th>Date</th>
-              <th>Time</th>
+              <th>Date / Time</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {appointments.length > 0 ? (
-              appointments.map((apt) => (
-                <tr key={apt._id} className={`status-${apt.status}`}>
-                  <td>
-                      <div className="patient-name">{apt.userId?.name || 'Unknown'}</div>
-                      <div className="patient-contact">{apt.userId?.phone || '-'}</div>
-                  </td>
-                  <td>{apt.userId?.patientId || '-'}</td>
-                  <td>{apt.doctorName || apt.doctorId?.name || 'Unknown'}</td>
-                  <td>{apt.serviceName}</td>
-                  <td>{formatDate(apt.appointmentDate)}</td>
-                  <td>{apt.appointmentTime}</td>
-                  <td>
-                    <span className={`status-badge ${apt.status}`}>
-                      {apt.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      {apt.status !== 'cancelled' && apt.status !== 'completed' && (
-                          <>
-                              <button 
-                                  className="btn-reschedule"
-                                  onClick={() => openRescheduleModal(apt)}
-                              >
-                                  Reschedule
-                              </button>
-                              <button 
-                                  className="btn-cancel"
-                                  onClick={() => handleCancel(apt._id)}
-                              >
-                                  Cancel
-                              </button>
-                          </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-                !loading && (
-                    <tr>
-                        <td colSpan="8" className="no-data">No appointments found.</td>
-                    </tr>
-                )
-            )}
+            {appointments.map((apt) => (
+              <tr key={apt._id} className={`status-${apt.status}`}>
+                <td>
+                    <b>{apt.userId?.name}</b><br/>
+                    <small>{apt.userId?.phone}</small>
+                </td>
+                <td>{apt.doctorName || apt.doctorId?.name}</td>
+                <td>{formatDate(apt.appointmentDate)} at {apt.appointmentTime}</td>
+                <td><span className={`status-badge ${apt.status}`}>{apt.status}</span></td>
+                <td>
+                  {apt.status !== 'cancelled' && (
+                    <>
+                      <button onClick={() => {
+                        setSelectedAppointment(apt);
+                        setNewDate(new Date(apt.appointmentDate).toISOString().split('T')[0]);
+                        setNewTime(apt.appointmentTime);
+                        setShowModal(true);
+                      }}>Reschedule</button>
+                      <button style={{marginLeft: '10px', color: 'red'}} onClick={() => handleCancel(apt._id)}>Cancel</button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!loading && appointments.length === 0 && <tr><td colSpan="5">No appointments found.</td></tr>}
           </tbody>
         </table>
       </div>
 
-      {/* Reschedule Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2>Reschedule Appointment</h2>
-            <p className="modal-subtitle">
-                For <strong>{selectedAppointment?.userId?.name}</strong> with Dr. <strong>{selectedAppointment?.doctorName}</strong>
-            </p>
-            
-            {rescheduleError && <div className="modal-error">{rescheduleError}</div>}
-            
+            <h3>Reschedule Appointment</h3>
             <form onSubmit={handleRescheduleSubmit}>
-              <div className="form-group">
-                <label>New Date</label>
-                <input 
-                  type="date" 
-                  value={newDate} 
-                  onChange={(e) => setNewDate(e.target.value)} 
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>New Time</label>
-                <input 
-                  type="time" 
-                  value={newTime} 
-                  onChange={(e) => setNewTime(e.target.value)} 
-                  required
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="submit" className="btn-confirm">Confirm Reschedule</button>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setShowModal(false)}
-                >
-                  Close
-                </button>
-              </div>
+              <label>New Date: <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} required /></label>
+              <br/>
+              <label>New Time: <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} required /></label>
+              <br/><br/>
+              <button type="submit">Confirm</button>
+              <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
             </form>
           </div>
         </div>
