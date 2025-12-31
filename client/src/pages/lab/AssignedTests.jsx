@@ -77,7 +77,7 @@ const AssignedTests = () => {
 
     const formData = new FormData();
     formData.append('reportFile', selectedFile);
-    formData.append('notes', notes); // Appending notes to FormData
+    formData.append('notes', notes); 
 
     await dispatch(uploadLabReport({ id: selectedRequest._id, formData }));
   };
@@ -100,7 +100,7 @@ const AssignedTests = () => {
   };
 
   return (
-    <div className="lab-page-container">
+    <div className="lab">
       {/* --- Header Section --- */}
       <header className="lab-header">
         <div className="header-title">
