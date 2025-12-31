@@ -13,6 +13,8 @@ const publicRoutes = require('./routes/public.routes')
 const uploadRoutes = require('./routes/upload.routes')
 const labRoutes = require('./routes/lab.routes')
 const receptionRoutes = require('./routes/reception.routes') // <--- 1. IMPORT THIS
+const pharmacyRoutes = require('./routes/pharmacy.routes')
+const pharmacyOrderRoutes = require('./routes/pharmacyOrders.routes')
 
 const app = express()
 
@@ -41,6 +43,8 @@ app.use('/api/public', publicRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/lab', labRoutes);
 app.use('/api/reception', receptionRoutes); // <--- 2. MOUNT THIS (Use exact path)
+app.use('/api/pharmacy', pharmacyRoutes);
+app.use('/api/pharmacy/orders', pharmacyOrderRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
