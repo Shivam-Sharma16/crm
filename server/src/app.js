@@ -11,7 +11,8 @@ const doctorRoutes = require('./routes/doctor.routes')
 const adminEntitiesRoutes = require('./routes/admin-entities.routes')
 const publicRoutes = require('./routes/public.routes')
 const uploadRoutes = require('./routes/upload.routes')
-const labRoutes = require('./routes/lab.routes');
+const labRoutes = require('./routes/lab.routes')
+const receptionRoutes = require('./routes/reception.routes') // <--- IMPORT THIS
 
 const app = express()
 
@@ -39,12 +40,13 @@ app.use('/api/admin-entities', adminEntitiesRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/lab', labRoutes);
+app.use('/api/reception', receptionRoutes); // <--- MOUNT THIS
+
 // Health check route
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is running' })
 })
 
-// Root route for server check
 app.get('/', (req, res) => {
     res.send('API is running...')
 })

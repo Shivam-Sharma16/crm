@@ -20,7 +20,7 @@ router.get('/reception/all', verifyToken, async (req, res) => {
 
     const appointments = await Appointment.find({})
       .populate('userId', 'name email phone patientId')
-      .populate('doctorId', 'name') // Helpful to show Doctor name
+      .populate('doctorId', 'name') 
       .sort({ appointmentDate: -1, appointmentTime: -1 })
       .lean();
 
@@ -261,6 +261,9 @@ router.post('/create', verifyToken, async (req, res) => {
 
     const savedAppointment = await appointment.save();
     
+    console.log("[BACKEND] Appointment Created & Saved. ID:", savedAppointment._id);
+    console.log("------------------------------------------");
+
     res.status(201).json({ success: true, message: 'Appointment booked successfully', appointment: savedAppointment });
 
   } catch (error) {
@@ -274,6 +277,7 @@ router.get('/my-appointments', verifyToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
+    // Explicitly select all fields to ensure they are returned to frontend
     const appointments = await Appointment.find({ userId })
       .select('userId patientId doctorId doctorName serviceName appointmentDate appointmentTime status paymentStatus amount notes prescriptionDescription doctorNotes symptoms diagnosis ivfDetails prescription prescriptions labTests dietPlan pharmacy')
       .sort({ appointmentDate: -1, appointmentTime: -1 })
