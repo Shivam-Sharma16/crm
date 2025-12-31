@@ -1,5 +1,6 @@
+// client/src/routes/Mainroutes.jsx
 import React from 'react';
-import { Routes, Route } from 'react-router-dom'; // No BrowserRouter here (it's in main.jsx)
+import { Routes, Route } from 'react-router-dom';
 
 // Components
 import Navbar from '../components/Navbar';
@@ -17,12 +18,11 @@ import Pharmacy from '../pages/user/Pharmacy';
 import Login from '../pages/user/Login';
 import Signup from '../pages/user/Signup';
 
-
 // Doctor Pages
 import Patient from '../pages/doctors/Patient';
 import DoctorPatientDetails from '../pages/doctors/DoctorPatientDetails';
 
-// Admin Pages (These were missing!)
+// Admin Pages
 import Admin from '../pages/admin/Admin';
 import AdminDoctors from '../pages/admin/AdminDoctors';
 import AdminLabs from '../pages/admin/AdminLabs';
@@ -35,10 +35,14 @@ import AdminLogin from '../pages/administration/AdminLogin';
 import AdminSignup from '../pages/administration/AdminSignup';
 import Administrator from '../pages/administration/Administrator';
 
-//lab
+// Lab Pages
 import LabDashboard from '../pages/lab/LabDashboard';
 import AssignedTests from '../pages/lab/AssignedTests';
 import CompletedReports from '../pages/lab/CompletedReports';
+
+// Pharmacy Management Pages (New)
+import PharmacyInventory from '../pages/pharmacy/PharmacyInventory';
+import PharmacyOrders from '../pages/pharmacy/PharmacyOrders';
 
 export const MainRoutes = () => {
   return (
@@ -66,20 +70,17 @@ export const MainRoutes = () => {
         <Route path="/doctor/patients" element={<Patient />} />
         <Route path="/doctor/patients/:appointmentId" element={<DoctorPatientDetails />} />
 
-        {/* --- Admin Routes (FIXED) --- */}
+        {/* --- Admin Routes --- */}
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/signup" element={<AdminSignup />} />
-        
-        {/* These specific routes were causing the "No route matched" error */}
         <Route path="/admin/doctors" element={<AdminDoctors />} />
         <Route path="/admin/labs" element={<AdminLabs />} />
         <Route path="/admin/pharmacy" element={<AdminPharmacy />} />
         <Route path="/admin/reception" element={<AdminReception />} />
         <Route path="/admin/services" element={<AdminServices />} />
 
-        {/* administration routes */}
-        
+        {/* --- Administrator Routes --- */}
         <Route path="/administrator/login" element={<AdminLogin />} />
         <Route path="/administrator/signup" element={<AdminSignup />} />
         <Route path="/administrator" element={<Administrator />} />
@@ -97,11 +98,21 @@ export const MainRoutes = () => {
         } />
          <Route path="/lab/completed-reports" element={
             <ProtectedRoute allowedRoles={['lab']}>
-                {/* Reusing AssignedTests but fetching completed status if you implement filters */}
                 <CompletedReports /> 
             </ProtectedRoute>
         } />
-        {/* Add Pending/Completed/Profile similarly */}
+
+        {/* --- Pharmacy Management Routes --- */}
+        <Route path="/pharmacy/inventory" element={
+            <ProtectedRoute allowedRoles={['pharmacy']}>
+                <PharmacyInventory />
+            </ProtectedRoute>
+        } />
+        <Route path="/pharmacy/orders" element={
+            <ProtectedRoute allowedRoles={['pharmacy']}>
+                <PharmacyOrders />
+            </ProtectedRoute>
+        } />
       </Routes>
     </>
   );
