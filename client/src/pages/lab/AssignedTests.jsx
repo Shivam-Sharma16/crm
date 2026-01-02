@@ -1,19 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchLabRequests, uploadLabReport, clearLabErrors } from '../../store/slices/labSlice';
-import { FaSearch, FaFilter, FaUserInjured, FaUserMd, FaVial, FaFileMedical, FaCloudUploadAlt, FaTimes, FaCheckCircle, FaCalendarAlt, FaNotesMedical } from 'react-icons/fa';
+import { fetchLabRequests, uploadLabReport, clearLabErrors, updateLabPayment } from '../../store/slices/labSlice';
+import { 
+  FaSearch, FaFilter, FaUserInjured, FaUserMd, FaVial, FaFileMedical, 
+  FaCloudUploadAlt, FaTimes, FaCheckCircle, FaCalendarAlt, FaNotesMedical, 
+  FaMoneyBillWave, FaCreditCard 
+} from 'react-icons/fa';
 import './AssignedTests.css';
 
 const AssignedTests = () => {
   const dispatch = useAppDispatch();
   const { requests, loading, error, uploadSuccess } = useAppSelector((state) => state.lab);
   
-  // Local State
+  // Local State for standard form fields
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRequest, setSelectedRequest] = useState(null); // For Modal
+  const [selectedRequest, setSelectedRequest] = useState(null); 
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+
+  // --- NEW: Local State for Payment Details ---
+  const [paymentInfo, setPaymentInfo] = useState({
+    status: 'PENDING',
+    mode: 'NONE',
+    amount: 0
+  });
 
   useEffect(() => {
     dispatch(fetchLabRequests('pending'));
@@ -38,12 +49,34 @@ const AssignedTests = () => {
     setSelectedRequest(request);
     setNotes(request.notes || '');
     setSelectedFile(null);
+    // Initialize payment info from the request object
+    setPaymentInfo({
+        status: request.paymentStatus || 'PENDING',
+        mode: request.paymentMode || 'NONE',
+        amount: request.amount || 0
+    });
   };
 
   const closeModal = () => {
     setSelectedRequest(null);
     setNotes('');
     setSelectedFile(null);
+  };
+
+  // --- NEW: Handle Payment Status and Detail Updates ---
+  const handlePaymentUpdate = async () => {
+    // Determine new status and mode
+    const updatedStatus = paymentInfo.status === 'PAID' ? 'PENDING' : 'PAID';
+    const payload = {
+        ...paymentInfo,
+        status: updatedStatus,
+        // Default to CASH if marking as paid and no mode selected
+        mode: updatedStatus === 'PAID' ? (paymentInfo.mode === 'NONE' ? 'CASH' : paymentInfo.mode) : 'NONE'
+    };
+    
+    // Update state and notify backend
+    await dispatch(updateLabPayment({ id: selectedRequest._id, paymentData: payload }));
+    setPaymentInfo(payload);
   };
 
   const handleDrag = (e) => {
@@ -73,7 +106,8 @@ const AssignedTests = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedRequest || !selectedFile) return;
+    // Logic: Block submission if no file OR if payment is not marked as PAID
+    if (!selectedRequest || !selectedFile || paymentInfo.status !== 'PAID') return;
 
     const formData = new FormData();
     formData.append('reportFile', selectedFile);
@@ -82,7 +116,7 @@ const AssignedTests = () => {
     await dispatch(uploadLabReport({ id: selectedRequest._id, formData }));
   };
 
-  // --- Helper: Get Prescription ---
+  // --- Helpers ---
   const getDoctorPrescription = (appointment) => {
     if (!appointment) return null;
     if (appointment.prescriptions?.length > 0) {
@@ -145,7 +179,9 @@ const AssignedTests = () => {
                 return (
                     <div key={req._id} className="lab-card">
                         <div className="card-header">
-                            <span className="patient-id">ID: #{req.patientId || 'N/A'}</span>
+                            <span className={`payment-badge ${req.paymentStatus?.toLowerCase()}`}>
+                                {req.paymentStatus}
+                            </span>
                             <span className="date-badge"><FaCalendarAlt/> {formatDate(req.appointmentId?.appointmentDate)}</span>
                         </div>
                         
@@ -154,11 +190,10 @@ const AssignedTests = () => {
                                 <div className="info-group">
                                     <label><FaUserInjured/> Patient</label>
                                     <h4>{req.userId?.name}</h4>
-                                    <span>{req.userId?.gender}, {req.userId?.age} yrs</span>
                                 </div>
                                 <div className="info-group">
-                                    <label><FaUserMd/> Doctor</label>
-                                    <h4>{req.doctorId?.name}</h4>
+                                    <label><FaMoneyBillWave/> Amount</label>
+                                    <h4>₹{req.amount || 0}</h4>
                                 </div>
                             </div>
 
@@ -195,79 +230,108 @@ const AssignedTests = () => {
         <div className="lab-modal-overlay" onClick={closeModal}>
           <div className="lab-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Upload Lab Report</h2>
+              <h2>Processing Lab Request</h2>
               <button className="close-btn" onClick={closeModal}><FaTimes/></button>
             </div>
             
-            <form onSubmit={handleSubmit} className="modal-content">
-              {/* Summary Section */}
-              <div className="modal-summary">
-                <div className="summary-item">
-                    <span>Patient:</span>
-                    <strong>{selectedRequest.userId?.name}</strong>
+            <div className="modal-content">
+              {/* --- NEW: Payment Verification Section --- */}
+              <div className="payment-config-section">
+                <h3><FaCreditCard/> Payment Verification</h3>
+                <div className="payment-grid">
+                    <div className="form-group">
+                        <label>Total Charges (₹)</label>
+                        <input 
+                            type="number" 
+                            value={paymentInfo.amount} 
+                            onChange={(e) => setPaymentInfo({...paymentInfo, amount: Number(e.target.value)})}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Mode of Payment</label>
+                        <select 
+                            value={paymentInfo.mode} 
+                            onChange={(e) => setPaymentInfo({...paymentInfo, mode: e.target.value})}
+                        >
+                            <option value="NONE">Select Mode</option>
+                            <option value="CASH">Cash</option>
+                            <option value="UPI">UPI / QR Code</option>
+                            <option value="CARD">Card Payment</option>
+                            <option value="ONLINE">Online Transfer</option>
+                        </select>
+                    </div>
                 </div>
-                <div className="summary-item">
-                    <span>Tests:</span>
-                    <strong>{selectedRequest.testNames?.join(', ')}</strong>
-                </div>
-              </div>
-
-              {/* Input: Notes */}
-              <div className="form-group">
-                <label><FaNotesMedical/> Lab Technician Notes</label>
-                <textarea 
-                  value={notes} 
-                  onChange={(e) => setNotes(e.target.value)} 
-                  placeholder="Enter observations, test result summaries, or internal notes..."
-                  rows="3"
-                ></textarea>
-              </div>
-
-              {/* Input: File Upload (Drag & Drop) */}
-              <div className="form-group">
-                <label><FaCloudUploadAlt/> Report File (PDF/Image)</label>
-                <div 
-                    className={`drop-zone ${dragActive ? 'active' : ''} ${selectedFile ? 'has-file' : ''}`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                >
-                    <input 
-                        type="file" 
-                        id="report-file" 
-                        accept=".pdf,.jpg,.png,.jpeg" 
-                        onChange={handleFileChange}
-                        hidden
-                    />
-                    
-                    {selectedFile ? (
-                        <div className="file-info">
-                            <FaFileMedical className="file-icon"/>
-                            <span>{selectedFile.name}</span>
-                            <button type="button" onClick={() => setSelectedFile(null)} className="remove-file">Change</button>
-                        </div>
-                    ) : (
-                        <div className="upload-prompt">
-                            <FaCloudUploadAlt className="upload-icon-large"/>
-                            <p>Drag & Drop file here or <label htmlFor="report-file">Browse</label></p>
-                            <span>Supports PDF, JPG, PNG</span>
-                        </div>
-                    )}
-                </div>
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button>
                 <button 
-                    type="submit" 
-                    className={`btn-submit ${loading ? 'loading' : ''}`}
-                    disabled={!selectedFile || loading}
+                    type="button" 
+                    className={`btn-payment-toggle ${paymentInfo.status === 'PAID' ? 'is-paid' : ''}`}
+                    onClick={handlePaymentUpdate}
                 >
-                    {loading ? 'Uploading...' : 'Confirm Upload'}
+                    {paymentInfo.status === 'PAID' ? 'Payment Verified' : 'Mark as Paid'}
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSubmit}>
+                {/* Input: Notes */}
+                <div className="form-group">
+                    <label><FaNotesMedical/> Technician Observations</label>
+                    <textarea 
+                        value={notes} 
+                        onChange={(e) => setNotes(e.target.value)} 
+                        placeholder="Add results summary or internal notes..."
+                        rows="2"
+                    ></textarea>
+                </div>
+
+                {/* Input: File Upload */}
+                <div className="form-group">
+                    <label><FaCloudUploadAlt/> Final Report (PDF/Image)</label>
+                    <div 
+                        className={`drop-zone ${dragActive ? 'active' : ''} ${selectedFile ? 'has-file' : ''}`}
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                    >
+                        <input 
+                            type="file" 
+                            id="report-file" 
+                            accept=".pdf,.jpg,.png,.jpeg" 
+                            onChange={handleFileChange}
+                            hidden
+                        />
+                        
+                        {selectedFile ? (
+                            <div className="file-info">
+                                <FaFileMedical className="file-icon"/>
+                                <span>{selectedFile.name}</span>
+                                <button type="button" onClick={() => setSelectedFile(null)} className="remove-file">Change</button>
+                            </div>
+                        ) : (
+                            <div className="upload-prompt">
+                                <FaCloudUploadAlt className="upload-icon-large"/>
+                                <p>Drag & Drop report here or <label htmlFor="report-file">Browse</label></p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="modal-actions">
+                    <button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button>
+                    <button 
+                        type="submit" 
+                        className={`btn-submit ${loading ? 'loading' : ''}`}
+                        disabled={!selectedFile || paymentInfo.status !== 'PAID' || loading}
+                    >
+                        {loading ? 'Uploading...' : 'Confirm & Sync Report'}
+                    </button>
+                </div>
+                
+                {/* Payment Warning */}
+                {paymentInfo.status !== 'PAID' && (
+                    <p className="payment-warning">Note: You must verify payment before the system allows syncing the report to the doctor.</p>
+                )}
+              </form>
+            </div>
           </div>
         </div>
       )}

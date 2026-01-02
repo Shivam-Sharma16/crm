@@ -20,6 +20,11 @@ const verifyLabRole = (req, res, next) => {
     }
 };
 
+/**
+ * @route   GET /api/lab/stats
+ * @desc    Get counts of pending and completed lab tests
+ * @access  Private (Lab)
+ */
 router.get('/stats', verifyToken, verifyLabRole, async (req, res) => {
     try {
         const total = await LabReport.countDocuments();
@@ -31,6 +36,11 @@ router.get('/stats', verifyToken, verifyLabRole, async (req, res) => {
     }
 });
 
+/**
+ * @route   GET /api/lab/requests
+ * @desc    Fetch lab test requests filtered by status
+ * @access  Private (Lab)
+ */
 router.get('/requests', verifyToken, verifyLabRole, async (req, res) => {
     try {
         const { status } = req.query;
@@ -40,7 +50,6 @@ router.get('/requests', verifyToken, verifyLabRole, async (req, res) => {
         else if (status === 'pending') query.testStatus = 'PENDING';
 
         const reports = await LabReport.find(query)
-            // --- CRITICAL FIX: Populate prescription fields ---
             .populate('appointmentId', 'appointmentDate appointmentTime serviceName prescription prescriptions')
             .populate('userId', 'name email phone gender age')
             .populate('doctorId', 'name')
@@ -52,14 +61,73 @@ router.get('/requests', verifyToken, verifyLabRole, async (req, res) => {
     }
 });
 
+/**
+ * @route   PATCH /api/lab/update-payment/:id
+ * @desc    Update payment status, mode, and amount for a specific lab request
+ * @access  Private (Lab)
+ */
+router.patch('/update-payment/:id', verifyToken, verifyLabRole, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { paymentStatus, paymentMode, amount } = req.body;
+
+        const report = await LabReport.findByIdAndUpdate(
+            id,
+            { 
+                paymentStatus, 
+                paymentMode, 
+                amount 
+            },
+            { new: true }
+        );
+
+        if (!report) {
+            return res.status(404).json({ success: false, message: 'Lab request not found' });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Payment details updated successfully', 
+            report 
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to update payment details', 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * @route   POST /api/lab/upload-report/:id
+ * @desc    Upload report file and sync with appointment. 
+ * Enforces a check for PAID status.
+ * @access  Private (Lab)
+ */
 router.post('/upload-report/:id', verifyToken, verifyLabRole, upload.single('reportFile'), async (req, res) => {
     try {
         const { id } = req.params;
         const report = await LabReport.findById(id);
 
-        if (!report) return res.status(404).json({ success: false, message: 'Lab request not found' });
-        if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+        if (!report) {
+            return res.status(404).json({ success: false, message: 'Lab request not found' });
+        }
 
+        // --- PAYMENT STATUS CHECK ---
+        // Prevents report upload if the lab technician has not marked the payment as PAID
+        if (report.paymentStatus !== 'PAID') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot upload report. Payment must be completed first.' 
+            });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        // Upload to ImageKit
         const result = await imagekit.upload({
             file: req.file.buffer,
             fileName: `lab_report_${id}_${Date.now()}`,
@@ -67,6 +135,7 @@ router.post('/upload-report/:id', verifyToken, verifyLabRole, upload.single('rep
             tags: ['lab_report', report.appointmentId.toString()]
         });
 
+        // Update Lab Report Record
         report.reportFile = {
             url: result.url,
             fileId: result.fileId,
@@ -75,8 +144,15 @@ router.post('/upload-report/:id', verifyToken, verifyLabRole, upload.single('rep
         };
         report.reportStatus = 'UPLOADED';
         report.testStatus = 'DONE';
+        
+        // Capture any final notes sent during the upload phase
+        if (req.body.notes) {
+            report.notes = req.body.notes;
+        }
+        
         await report.save();
 
+        // Sync report back to the parent appointment's prescriptions array
         await Appointment.findByIdAndUpdate(report.appointmentId, {
             $push: {
                 prescriptions: { 
@@ -88,7 +164,7 @@ router.post('/upload-report/:id', verifyToken, verifyLabRole, upload.single('rep
             }
         });
 
-        res.json({ success: true, message: 'Report uploaded and synced', report });
+        res.json({ success: true, message: 'Report uploaded and synced successfully', report });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Upload failed', error: error.message });
     }

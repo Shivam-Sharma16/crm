@@ -40,6 +40,21 @@ const labReportSchema = new mongoose.Schema({
     enum: ['PENDING', 'UPLOADED'],
     default: 'PENDING'
   },
+  paymentStatus: {
+    type: String,
+    enum: ['PENDING', 'PAID'],
+    default: 'PENDING',
+    index: true
+  },
+  paymentMode: {
+    type: String,
+    enum: ['CASH', 'ONLINE', 'UPI', 'CARD', 'NONE'],
+    default: 'NONE'
+  },
+  amount: {
+    type: Number,
+    default: 0
+  },
   reportFile: {
     url: String,
     fileId: String,
