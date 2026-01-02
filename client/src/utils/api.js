@@ -1,3 +1,4 @@
+// client/src/utils/api.js
 import axios from 'axios';
 
 // Create axios instance with base URL from environment variable
@@ -18,7 +19,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(error); 
   }
 );
 
@@ -41,8 +42,6 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-
 
 export const authAPI = {
   login: async (email, password) => {
@@ -169,7 +168,6 @@ export const adminEntitiesAPI = {
   },
 };
 
-// --- RECEPTION API (ADDED THIS) ---
 export const receptionAPI = {
   getAllAppointments: async () => {
     const response = await apiClient.get('/api/reception/appointments');
@@ -190,8 +188,16 @@ export const labAPI = {
     const response = await apiClient.get('/api/lab/stats');
     return response.data;
   },
+  getMyReports: async () => {
+    const response = await apiClient.get('/api/lab/my-reports');
+    return response.data;
+  },
   getRequests: async (status) => {
     const response = await apiClient.get(`/api/lab/requests?status=${status || ''}`);
+    return response.data;
+  },
+  updatePayment: async (id, paymentData) => {
+    const response = await apiClient.patch(`/api/lab/update-payment/${id}`, paymentData);
     return response.data;
   },
   uploadReport: async (id, formData) => {
