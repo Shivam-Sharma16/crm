@@ -59,6 +59,17 @@ export const uploadLabReport = createAsyncThunk(
   }
 );
 
+export const fetchMyLabReports = createAsyncThunk(
+  'lab/fetchMyReports',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await labAPI.getMyReports();
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch reports');
+    }
+  }
+);
+
 // --- Slice ---
 
 const labSlice = createSlice({

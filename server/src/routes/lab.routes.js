@@ -99,6 +99,24 @@ router.patch('/update-payment/:id', verifyToken, verifyLabRole, async (req, res)
     }
 });
 
+router.get('/my-reports', verifyToken, async (req, res) => {
+    try {
+        // Find reports where userId matches the logged-in user
+        const reports = await LabReport.find({ userId: req.user.userId })
+            .populate('doctorId', 'name')
+            .populate('appointmentId', 'appointmentDate serviceName')
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, reports });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error fetching your reports', 
+            error: error.message 
+        });
+    }
+});
+
 /**
  * @route   POST /api/lab/upload-report/:id
  * @desc    Upload report file and sync with appointment. 

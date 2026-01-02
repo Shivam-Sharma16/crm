@@ -190,6 +190,10 @@ export const labAPI = {
     const response = await apiClient.get('/api/lab/stats');
     return response.data;
   },
+  getMyReports: async () => {
+    const response = await apiClient.get('/api/lab/my-reports');
+    return response.data;
+  },
   getRequests: async (status) => {
     const response = await apiClient.get(`/api/lab/requests?status=${status || ''}`);
     return response.data;
