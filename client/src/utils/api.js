@@ -209,12 +209,7 @@ export const labAPI = {
 };
 
 // NEW: Pharmacy API for user-specific data
-export const pharmacyAPI = {
-  getMyOrders: async () => {
-    const response = await apiClient.get('/api/pharmacy/orders/my-orders');
-    return response.data;
-  }
-};
+
 
 export const publicAPI = {
   getServices: async () => {
@@ -233,6 +228,31 @@ export const uploadAPI = {
     const response = await apiClient.post('/api/upload/images', formData);
     return response.data;
   },
+};
+export const pharmacyAPI = {
+    getInventory: async () => {
+        const response = await apiClient.get('/api/pharmacy/inventory');
+        return response.data;
+    },
+    addMedicine: async (data) => {
+        const response = await apiClient.post('/api/pharmacy/inventory', data);
+        return response.data;
+    },
+    deleteMedicine: async (id) => {
+        const response = await apiClient.delete(`/api/pharmacy/inventory/${id}`);
+        return response.data;
+    }
+};
+
+export const pharmacyOrderAPI = {
+    getOrders: async () => {
+        const response = await apiClient.get('/api/pharmacy/orders');
+        return response.data;
+    },
+    completeOrder: async (id) => {
+        const response = await apiClient.patch(`/api/pharmacy/orders/${id}/complete`);
+        return response.data;
+    }
 };
 
 export default apiClient;

@@ -1,61 +1,108 @@
-// client/src/pages/pharmacy/PharmacyOrders.jsx
-import React from 'react';
-import './PharmacyInventory.css'; // Reusing the same CSS for consistency
+import React, { useState, useEffect } from 'react';
+import { pharmacyOrderAPI } from '../../utils/api';
+import './PharmacyInventory.css';
 
 const PharmacyOrders = () => {
-  // Mock Data
-  const orders = [
-    { id: 'ORD-001', patient: 'John Doe', items: 3, total: 450, status: 'Pending', date: '2024-03-20' },
-    { id: 'ORD-002', patient: 'Sarah Smith', items: 1, total: 120, status: 'Processing', date: '2024-03-19' },
-    { id: 'ORD-003', patient: 'Mike Ross', items: 5, total: 1250, status: 'Completed', date: '2024-03-18' },
-  ];
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-  return (
-    <div className="pharmacy-management-container">
-      <div className="pharmacy-header">
-        <h1>Order Management</h1>
-        <p>View and process incoming medication orders.</p>
-      </div>
+    useEffect(() => {
+        fetchOrders();
+    }, []);
 
-      <div className="inventory-table-wrapper">
-        <table className="inventory-table">
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Patient Name</th>
-              <th>Items</th>
-              <th>Total Amount</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((order) => (
-              <tr key={order.id}>
-                <td style={{fontWeight: 'bold', color: '#0A2647'}}>{order.id}</td>
-                <td>{order.patient}</td>
-                <td>{order.items} items</td>
-                <td>₹{order.total}</td>
-                <td>{order.date}</td>
-                <td>
-                  <span className={`status-badge ${
-                    order.status === 'Completed' ? 'status-active' : 
-                    order.status === 'Pending' ? 'status-low' : 'status-processing'
-                  }`} style={order.status === 'Processing' ? {background: '#fef3c7', color: '#b45309'} : {}}>
-                    {order.status}
-                  </span>
-                </td>
-                <td>
-                  <button className="btn-add" style={{padding: '4px 12px', fontSize: '0.8rem'}}>View</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+    const fetchOrders = async () => {
+        try {
+            setLoading(true);
+            const res = await pharmacyOrderAPI.getOrders();
+            if (res.success) setOrders(res.orders);
+        } catch (err) {
+            console.error("Failed to fetch pharmacy orders", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCompleteOrder = async (orderId) => {
+        if (!window.confirm("Mark this order as Paid and Completed?")) return;
+        try {
+            const res = await pharmacyOrderAPI.completeOrder(orderId);
+            if (res.success) {
+                alert("Order completed!");
+                fetchOrders();
+            }
+        } catch (err) {
+            alert("Failed to update order.");
+        }
+    };
+
+    return (
+        <div className="pharmacy-management-container">
+            <div className="pharmacy-header">
+                <h1>Order Management</h1>
+                <p>Process prescriptions sent by doctors and confirm payments.</p>
+            </div>
+
+            <div className="inventory-table-wrapper">
+                {loading ? <div className="loader">Loading Orders...</div> : (
+                    <table className="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Patient Details</th>
+                                <th>Doctor</th>
+                                <th>Prescribed Items</th>
+                                <th>Status</th>
+                                <th>Payment</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {orders.map((order) => (
+                                <tr key={order._id}>
+                                    <td>
+                                        <div style={{ fontWeight: 'bold' }}>{order.userId?.name}</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#666' }}>{order.patientId}</div>
+                                    </td>
+                                    <td>Dr. {order.doctorId?.name}</td>
+                                    <td>
+                                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem' }}>
+                                            {order.items.map((item, idx) => (
+                                                <li key={idx}>• {item.medicineName} ({item.frequency})</li>
+                                            ))}
+                                        </ul>
+                                    </td>
+                                    <td>
+                                        <span className={`status-badge ${order.orderStatus === 'Completed' ? 'status-active' : 'status-low'
+                                            }`}>
+                                            {order.orderStatus}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span style={{
+                                            color: order.paymentStatus === 'Paid' ? '#166534' : '#991b1b',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {order.paymentStatus}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {order.orderStatus === 'Upcoming' && (
+                                            <button
+                                                className="btn-add"
+                                                style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                                                onClick={() => handleCompleteOrder(order._id)}
+                                            >
+                                                Complete & Paid
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
+    );
 };
 
-export default PharmacyOrders;
+export default PharmacyOrders; // Ensure this line exists to fix the SyntaxError
