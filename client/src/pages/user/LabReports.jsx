@@ -1,12 +1,11 @@
 // client/src/pages/user/LabReports.jsx
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector, useAuth } from '../../store/hooks';
 import { fetchMyLabReports } from '../../store/slices/labSlice';
 import './LabReports.css';
 
 const LabReports = () => {
-  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const { requests: reports, loading } = useAppSelector((state) => state.lab);
@@ -18,7 +17,6 @@ const LabReports = () => {
     dispatch(fetchMyLabReports());
   }, [dispatch]);
 
-  // Handle download
   const handleDownload = (url, fileName) => {
     if (!url) return;
     const link = document.createElement('a');
@@ -29,7 +27,6 @@ const LabReports = () => {
     document.body.removeChild(link);
   };
 
-  // Filter Logic
   const filteredReports = reports.filter(report => {
     const matchesStatus = filter === 'all' || 
       (filter === 'completed' && report.testStatus === 'DONE') ||
@@ -54,7 +51,6 @@ const LabReports = () => {
           <div className="header-content">
             <span className="badge">Patient Lab Portal</span>
             <h1>Your <span className="text-gradient">Medical Reports</span></h1>
-            <p className="header-subtext">Access your diagnostic results securely.</p>
             <p className="user-greeting">Welcome, <strong>{user?.name}</strong></p>
           </div>
         </section>
@@ -114,7 +110,6 @@ const LabReports = () => {
                         </div>
                       )}
                     </div>
-
                     {report.notes && (
                       <div className="report-notes">
                         <p><strong>Remarks:</strong> {report.notes}</p>

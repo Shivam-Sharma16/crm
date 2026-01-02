@@ -1,11 +1,9 @@
+// client/src/store/slices/labSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { labAPI } from '../../utils/api';
 
 // --- Thunks ---
 
-/**
- * Fetch general statistics for the lab dashboard.
- */
 export const fetchLabStats = createAsyncThunk(
   'lab/fetchStats',
   async (_, { rejectWithValue }) => {
@@ -17,9 +15,6 @@ export const fetchLabStats = createAsyncThunk(
   }
 );
 
-/**
- * Fetch lab requests filtered by status (e.g., 'pending', 'completed').
- */
 export const fetchLabRequests = createAsyncThunk(
   'lab/fetchRequests',
   async (status, { rejectWithValue }) => {
@@ -31,9 +26,6 @@ export const fetchLabRequests = createAsyncThunk(
   }
 );
 
-/**
- * NEW: Update payment details (status, mode, amount) for a lab request.
- */
 export const updateLabPayment = createAsyncThunk(
   'lab/updatePayment',
   async ({ id, paymentData }, { rejectWithValue }) => {
@@ -45,9 +37,6 @@ export const updateLabPayment = createAsyncThunk(
   }
 );
 
-/**
- * Upload the final report file and technician notes.
- */
 export const uploadLabReport = createAsyncThunk(
   'lab/uploadReport',
   async ({ id, formData }, { rejectWithValue }) => {
@@ -76,15 +65,12 @@ const labSlice = createSlice({
   name: 'lab',
   initialState: {
     stats: { total: 0, pending: 0, completed: 0 },
-    requests: [],
+    requests: [], // Used for both technician requests and patient reports
     loading: false,
     error: null,
     uploadSuccess: null
   },
   reducers: {
-    /**
-     * Resets error and success states.
-     */
     clearLabErrors: (state) => {
       state.error = null;
       state.uploadSuccess = null;
@@ -103,7 +89,7 @@ const labSlice = createSlice({
         state.error = action.payload;
       })
       
-      // Fetch Requests
+      // Fetch Requests (Technician view)
       .addCase(fetchLabRequests.pending, (state) => { state.loading = true; })
       .addCase(fetchLabRequests.fulfilled, (state, action) => {
         state.loading = false;
@@ -114,15 +100,23 @@ const labSlice = createSlice({
         state.error = action.payload;
       })
 
-      // NEW: Update Lab Payment
+      // Fetch My Reports (Patient view) - UPDATED
+      .addCase(fetchMyLabReports.pending, (state) => { state.loading = true; })
+      .addCase(fetchMyLabReports.fulfilled, (state, action) => {
+        state.loading = false;
+        state.requests = action.payload.reports; // Populate with the patient's reports
+      })
+      .addCase(fetchMyLabReports.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Update Lab Payment
       .addCase(updateLabPayment.pending, (state) => { state.loading = true; })
       .addCase(updateLabPayment.fulfilled, (state, action) => {
         state.loading = false;
-        // Update the local request object with the new payment data returned from the server
         const index = state.requests.findIndex(req => req._id === action.payload.report._id);
-        if (index !== -1) {
-            state.requests[index] = action.payload.report;
-        }
+        if (index !== -1) state.requests[index] = action.payload.report;
       })
       .addCase(updateLabPayment.rejected, (state, action) => {
         state.loading = false;
@@ -134,7 +128,6 @@ const labSlice = createSlice({
       .addCase(uploadLabReport.fulfilled, (state, action) => {
         state.loading = false;
         state.uploadSuccess = 'Report uploaded successfully';
-        // Remove the completed request from the current pending list
         state.requests = state.requests.filter(req => req._id !== action.payload.report._id);
         state.stats.pending -= 1;
         state.stats.completed += 1;
