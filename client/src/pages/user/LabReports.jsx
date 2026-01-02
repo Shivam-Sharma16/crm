@@ -30,7 +30,8 @@ const LabReports = () => {
   const filteredReports = reports.filter(report => {
     const matchesStatus = filter === 'all' || 
       (filter === 'completed' && report.testStatus === 'DONE') ||
-      (filter === 'pending' && report.testStatus === 'PENDING');
+      (filter === 'pending' && report.testStatus === 'PENDING') ||
+      (filter === 'pending' && report.testStatus === 'IN_PROGRESS');
 
     const matchesSearch = 
       report.testNames?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -47,7 +48,7 @@ const LabReports = () => {
     <div className="lab-reports-page">
       <div className="content-wrapper">
         <section className="reports-header animate-on-scroll slide-up visible">
-          <Link to="/" className="back-link">← Back to Home</Link>
+          <Link to="/dashboard" className="back-link">← Back to Dashboard</Link>
           <div className="header-content">
             <span className="badge">Patient Lab Portal</span>
             <h1>Your <span className="text-gradient">Medical Reports</span></h1>
@@ -67,11 +68,7 @@ const LabReports = () => {
           </div>
           <div className="filter-buttons">
             {['all', 'completed', 'pending'].map(f => (
-              <button 
-                key={f} 
-                className={`filter-btn ${filter === f ? 'active' : ''}`}
-                onClick={() => setFilter(f)}
-              >
+              <button key={f} className={`filter-btn ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
@@ -85,11 +82,11 @@ const LabReports = () => {
                 <div key={report._id} className="report-card">
                   <div className="report-card-header">
                     <div className="report-id">
-                      <span className="id-label">Test Status</span>
-                      <span className="id-value">{report.testStatus}</span>
+                      <span className="id-label">Test ID</span>
+                      <span className="id-value">#{report._id.slice(-6).toUpperCase()}</span>
                     </div>
                     <div className={`status-badge status-${report.testStatus === 'DONE' ? 'completed' : 'pending'}`}>
-                      {report.testStatus === 'DONE' ? '✓ Ready' : '⏳ In Progress'}
+                      {report.testStatus === 'DONE' ? '✓ Ready' : '⏳ ' + report.testStatus}
                     </div>
                   </div>
 
@@ -100,33 +97,23 @@ const LabReports = () => {
                     </div>
                     <div className="report-meta">
                       <div className="meta-item">
-                        <span className="meta-label">Assigned Date</span>
+                        <span className="meta-label">Date Requested</span>
                         <span className="meta-value">{new Date(report.createdAt).toLocaleDateString()}</span>
                       </div>
-                      {report.paymentStatus === 'PAID' && (
-                        <div className="meta-item">
-                          <span className="meta-label">Amount Paid</span>
-                          <span className="meta-value">₹{report.amount}</span>
-                        </div>
-                      )}
-                    </div>
-                    {report.notes && (
-                      <div className="report-notes">
-                        <p><strong>Remarks:</strong> {report.notes}</p>
+                      <div className="meta-item">
+                        <span className="meta-label">Payment</span>
+                        <span className={`meta-value ${report.paymentStatus.toLowerCase()}`}>{report.paymentStatus}</span>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   <div className="report-card-footer">
-                    {report.testStatus === 'DONE' ? (
-                      <button 
-                        className="btn btn-primary" 
-                        onClick={() => handleDownload(report.reportFile?.url, report.reportFile?.name)}
-                      >
+                    {report.testStatus === 'DONE' && report.reportFile?.url ? (
+                      <button className="btn btn-primary" onClick={() => handleDownload(report.reportFile?.url, report.reportFile?.name)}>
                         Download PDF
                       </button>
                     ) : (
-                      <button className="btn btn-secondary" disabled>Results Processing</button>
+                      <button className="btn btn-secondary" disabled>Processing Results</button>
                     )}
                   </div>
                 </div>
@@ -135,7 +122,7 @@ const LabReports = () => {
           ) : (
             <div className="empty-state">
               <h3>No Reports Found</h3>
-              <p>Your diagnostic records will appear here once processed by the lab.</p>
+              <p>Your diagnostic records will appear here once requested or processed.</p>
             </div>
           )}
         </section>

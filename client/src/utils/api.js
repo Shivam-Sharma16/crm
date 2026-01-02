@@ -208,6 +208,14 @@ export const labAPI = {
   }
 };
 
+// NEW: Pharmacy API for user-specific data
+export const pharmacyAPI = {
+  getMyOrders: async () => {
+    const response = await apiClient.get('/api/pharmacy/orders/my-orders');
+    return response.data;
+  }
+};
+
 export const publicAPI = {
   getServices: async () => {
     const response = await apiClient.get('/api/public/services');

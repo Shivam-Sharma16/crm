@@ -19,8 +19,8 @@ const Navbar = () => {
       <div className="navbar-container">
         {/* Logo/Brand */}
         <NavLink to="/" className="navbar-brand">
-          <span className="brand-icon">🏥</span>
-          <span className="brand-text">Krisna IVF</span>
+          <img src="/nav-logo.png" alt="Krisna IVF Logo" className="navbar-logo" />
+          {/* <span className="brand-text">Krisna IVF</span> */}
         </NavLink>
 
         {/* Navigation Links */}

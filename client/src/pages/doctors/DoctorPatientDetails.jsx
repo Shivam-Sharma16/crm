@@ -467,6 +467,7 @@ const DoctorPatientDetails = () => {
 
             <div className="form-group">
                 <textarea 
+                style={{color:'black'}}
                     rows="4"
                     className="notes-input"
                     value={notes}

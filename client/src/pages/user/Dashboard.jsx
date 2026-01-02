@@ -1,29 +1,25 @@
+// client/src/pages/user/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Dashboard.css';
-import './Appointment.css'; // Import shared styles for the details modal
+import './Appointment.css';
 
-// --- Modal Component for Prescription & Lab Details ---
 const PrescriptionModal = ({ appointment, onClose }) => {
   if (!appointment) return null;
 
-  // 1. Separate Lab Reports from Regular Prescriptions
   const labReports = appointment.prescriptions?.filter(doc => doc.type === 'lab_report') || [];
   const doctorPrescriptions = appointment.prescriptions?.filter(doc => doc.type !== 'lab_report') || [];
   
-  // Handle legacy single prescription field
   if (doctorPrescriptions.length === 0 && appointment.prescription) {
       doctorPrescriptions.push({ url: appointment.prescription, name: 'Prescription File' });
   }
 
-  // 2. Normalize Pharmacy Data
   const pharmacyItems = appointment.pharmacy?.map(p => ({
       name: p.medicineName || p.name,
       frequency: p.frequency || '-',
       duration: p.duration || '-'
   })) || [];
 
-  // 3. Normalize Diet Data
   const dietItems = appointment.dietPlan || appointment.diet || [];
 
   return (
@@ -34,7 +30,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
           <button className="close-details-btn" onClick={onClose}>×</button>
         </div>
         <div className="details-body">
-            {/* Basic Info */}
             <div className="details-info-grid">
                 <div><strong>Doctor:</strong> {appointment.doctorName}</div>
                 <div><strong>Date:</strong> {new Date(appointment.appointmentDate).toLocaleDateString()}</div>
@@ -42,7 +37,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
             </div>
             <hr />
             
-            {/* Diagnosis / Notes */}
             {appointment.notes && (
                 <div className="detail-section">
                     <h4>Diagnosis / Notes</h4>
@@ -50,7 +44,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Lab Tests Section */}
             {appointment.labTests && appointment.labTests.length > 0 && (
                 <div className="detail-section">
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '10px'}}>
@@ -69,7 +62,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Lab Reports Downloads */}
             {labReports.length > 0 && (
                 <div className="detail-section" style={{background: '#f0f9ff', padding: '15px', borderRadius: '8px', border: '1px solid #bae6fd'}}>
                     <h4 style={{color: '#0284c7', marginTop: 0}}>🔬 Lab Results</h4>
@@ -83,7 +75,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Pharmacy Section */}
             {pharmacyItems.length > 0 && (
                 <div className="detail-section">
                     <h4>Prescribed Medications</h4>
@@ -108,7 +99,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-             {/* Diet Section */}
              {dietItems.length > 0 && (
                 <div className="detail-section">
                     <h4>Dietary Recommendations</h4>
@@ -118,7 +108,6 @@ const PrescriptionModal = ({ appointment, onClose }) => {
                 </div>
             )}
 
-            {/* Doctor Prescriptions Documents */}
             {doctorPrescriptions.length > 0 && (
                 <div className="detail-section">
                     <h4>📝 Prescriptions</h4>
@@ -148,11 +137,8 @@ const Dashboard = () => {
   const [labReports, setLabReports] = useState([]);
   const [pharmacyOrders, setPharmacyOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State for Prescription Modal
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
-  // Check authentication and fetch data
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
@@ -163,60 +149,47 @@ const Dashboard = () => {
       fetchDashboardData(token);
     } else {
       navigate('/login?redirect=/dashboard');
-      return;
     }
   }, [navigate]);
 
-  // Scroll animation logic
   useEffect(() => {
-    window.scrollTo(0, 0);
-    
-    const observerOptions = {
-      root: null,
-      rootMargin: '0px',
-      threshold: 0.1
-    };
-
+    const observerOptions = { threshold: 0.1 };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
+        if (entry.isIntersecting) entry.target.classList.add('visible');
       });
     }, observerOptions);
 
     const elements = document.querySelectorAll('.animate-on-scroll');
     elements.forEach((el) => observer.observe(el));
-
-    return () => {
-      elements.forEach((el) => observer.unobserve(el));
-    };
+    return () => elements.forEach((el) => observer.unobserve(el));
   }, [isLoading]);
 
-  // Fetch all dashboard data
   const fetchDashboardData = async (token) => {
     setIsLoading(true);
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     try {
-      // Fetch appointments
-      const appointmentsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/appointments/my-appointments`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      // 1. Fetch Appointments
+      const appointmentsResponse = await fetch(`${API_BASE}/api/appointments/my-appointments`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const appointmentsData = await appointmentsResponse.json();
-      if (appointmentsData.success) {
-        setAppointments(appointmentsData.appointments || []);
-      }
+      if (appointmentsData.success) setAppointments(appointmentsData.appointments || []);
 
-      // Fetch lab reports (mock data for now)
-      const userData = JSON.parse(localStorage.getItem('user'));
-      const mockLabReports = getMockLabReports(userData);
-      setLabReports(mockLabReports);
+      // 2. Fetch Lab Reports
+      const labResponse = await fetch(`${API_BASE}/api/lab/my-reports`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const labData = await labResponse.json();
+      if (labData.success) setLabReports(labData.reports || []);
 
-      // Fetch pharmacy orders (mock data for now)
-      const mockPharmacyOrders = getMockPharmacyOrders(userData);
-      setPharmacyOrders(mockPharmacyOrders);
+      // 3. Fetch Pharmacy Orders
+      const pharmacyResponse = await fetch(`${API_BASE}/api/pharmacy/orders/my-orders`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const pharmacyData = await pharmacyResponse.json();
+      if (pharmacyData.success) setPharmacyOrders(pharmacyData.orders || []);
+
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -224,64 +197,30 @@ const Dashboard = () => {
     }
   };
 
-  // Mock data functions
-  const getMockLabReports = (userData) => {
-    const allReports = [
-      { id: 1, reportId: 'LAB-2024-001', patientName: 'John Doe', userId: 'user1', patientEmail: 'john.doe@example.com', testType: 'Complete Blood Count (CBC)', testDate: '2024-01-15', status: 'completed', doctor: 'Dr. Sarah Cameron' },
-      { id: 2, reportId: 'LAB-2024-002', patientName: 'Jane Smith', userId: 'user2', patientEmail: 'jane.smith@example.com', testType: 'Lipid Profile', testDate: '2024-01-18', status: 'completed', doctor: 'Dr. Michael Ross' },
-      { id: 3, reportId: 'LAB-2024-003', patientName: 'Robert Johnson', userId: 'user3', patientEmail: 'robert.johnson@example.com', testType: 'Liver Function Test (LFT)', testDate: '2024-01-20', status: 'pending', doctor: 'Dr. Emily Chen' }
-    ];
-    if (!userData) return [];
-    const userId = userData.id || userData.userId || userData._id;
-    const userEmail = userData.email || userData.userEmail;
-    return allReports.filter(report => (userId && report.userId === userId) || (userEmail && report.patientEmail === userEmail));
-  };
-
-  const getMockPharmacyOrders = (userData) => {
-    const allOrders = [
-      { id: 1, orderId: 'PHARM-2024-001', patientName: 'John Doe', userId: 'user1', patientEmail: 'john.doe@example.com', orderDate: '2024-01-16', status: 'delivered', items: [{ name: 'Paracetamol 500mg', quantity: 2, price: 50 }, { name: 'Vitamin D3', quantity: 1, price: 200 }], totalAmount: 300, deliveryDate: '2024-01-18' },
-      { id: 2, orderId: 'PHARM-2024-002', patientName: 'Jane Smith', userId: 'user2', patientEmail: 'jane.smith@example.com', orderDate: '2024-01-19', status: 'processing', items: [{ name: 'Amoxicillin 500mg', quantity: 1, price: 150 }, { name: 'Cough Syrup', quantity: 1, price: 120 }], totalAmount: 270, deliveryDate: null }
-    ];
-    if (!userData) return [];
-    const userId = userData.id || userData.userId || userData._id;
-    const userEmail = userData.email || userData.userEmail;
-    return allOrders.filter(order => (userId && order.userId === userId) || (userEmail && order.patientEmail === userEmail));
-  };
-
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const isUpcoming = (appointmentDate, appointmentTime) => {
     if (!appointmentDate || !appointmentTime) return false;
-    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
-    return appointmentDateTime >= new Date();
+    return new Date(`${appointmentDate}T${appointmentTime}`) >= new Date();
   };
 
-  // Helper to check if details button should be shown
   const hasDetails = (app) => {
-      return app.status === 'completed' || 
-             app.notes || 
-             app.prescription || 
-             (app.prescriptions && app.prescriptions.length > 0) || 
-             (app.labTests && app.labTests.length > 0) ||
-             (app.pharmacy && app.pharmacy.length > 0);
+      return app.status === 'completed' || app.notes || app.prescription || 
+             (app.prescriptions?.length > 0) || (app.labTests?.length > 0) || (app.pharmacy?.length > 0);
   };
 
-  if (!isAuthenticated) return <div className="dashboard-page"><div className="content-wrapper"><div className="loading-state"><p>Loading...</p></div></div></div>;
+  if (!isAuthenticated) return null;
 
   return (
     <div className="dashboard-page">
       <div className="content-wrapper">
-        
-        {/* Header */}
         <section className="dashboard-header animate-on-scroll slide-up">
           <div className="header-content">
             <span className="badge">User Dashboard</span>
             <h1>Welcome back, <span className="text-gradient">{user?.name || 'User'}</span></h1>
             {user?.patientId && <p className="patient-id-display">Patient ID: {user.patientId}</p>}
-            <p className="header-subtext">Here's an overview of your appointments, lab reports, and pharmacy orders.</p>
           </div>
         </section>
 
@@ -289,28 +228,19 @@ const Dashboard = () => {
           <div className="loading-state"><div className="loading-spinner"></div><p>Loading your dashboard...</p></div>
         ) : (
           <div className="dashboard-grid">
-            
-            {/* Appointments Column */}
+            {/* Appointments */}
             <div className="dashboard-column animate-on-scroll slide-up delay-100">
               <div className="column-header">
                 <div className="column-icon">📅</div>
-                <div>
-                  <h2>Appointments</h2>
-                  <p className="column-count">{appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'}</p>
-                </div>
+                <div><h2>Appointments</h2><p className="column-count">{appointments.length} total</p></div>
               </div>
-              
               <div className="column-content">
                 {appointments.length > 0 ? (
                   <div className="items-list">
-                    {appointments.slice(0, 5).map((appointment) => {
-                      const upcoming = isUpcoming(appointment.appointmentDate, appointment.appointmentTime);
-                      
-                      return (
-                        <div key={appointment._id || appointment.id} className={`dashboard-item ${upcoming ? 'upcoming' : 'past'}`}>
+                    {appointments.slice(0, 5).map((appointment) => (
+                        <div key={appointment._id} className={`dashboard-item ${isUpcoming(appointment.appointmentDate, appointment.appointmentTime) ? 'upcoming' : 'past'}`}>
                           <div className="item-header">
                             <span className={`status-badge status-${appointment.status}`}>{appointment.status}</span>
-                            {upcoming && <span className="upcoming-badge">Upcoming</span>}
                           </div>
                           <div className="item-body">
                             <h3>{appointment.doctorName}</h3>
@@ -318,27 +248,17 @@ const Dashboard = () => {
                               <span className="detail">📅 {formatDate(appointment.appointmentDate)}</span>
                               <span className="detail">🕐 {appointment.appointmentTime}</span>
                             </div>
-                            {hasDetails(appointment) && (
-                                <button 
-                                    className="view-presc-btn" 
-                                    onClick={() => setSelectedAppointment(appointment)}
-                                >
-                                    View Details
-                                </button>
-                            )}
+                            {hasDetails(appointment) && <button className="view-presc-btn" onClick={() => setSelectedAppointment(appointment)}>View Details</button>}
                           </div>
                         </div>
-                      );
-                    })}
+                    ))}
                   </div>
-                ) : (
-                  <div className="empty-state-small"><div className="empty-icon">📅</div><p>No appointments yet</p></div>
-                )}
+                ) : <div className="empty-state-small"><p>No appointments yet</p></div>}
               </div>
               <div className="column-footer"><Link to="/appointment" className="view-all-link">View All Appointments →</Link></div>
             </div>
 
-            {/* Lab Reports Column */}
+            {/* Lab Reports */}
             <div className="dashboard-column animate-on-scroll slide-up delay-200">
               <div className="column-header">
                   <div className="column-icon">🔬</div>
@@ -346,9 +266,15 @@ const Dashboard = () => {
               </div>
               <div className="column-content">
                   {labReports.slice(0, 5).map(report => (
-                      <div key={report.id} className="dashboard-item">
-                          <div className="item-header"><span className="item-id">{report.reportId}</span><span className={`status-badge status-${report.status}`}>{report.status}</span></div>
-                          <div className="item-body"><h3>{report.testType}</h3><div className="item-details"><span className="detail">📅 {formatDate(report.testDate)}</span></div></div>
+                      <div key={report._id} className="dashboard-item">
+                          <div className="item-header">
+                            <span className="item-id">#{report._id.slice(-6).toUpperCase()}</span>
+                            <span className={`status-badge status-${report.testStatus?.toLowerCase()}`}>{report.testStatus}</span>
+                          </div>
+                          <div className="item-body">
+                            <h3>{report.testNames?.join(', ') || 'Diagnostic Tests'}</h3>
+                            <div className="item-details"><span className="detail">📅 {formatDate(report.createdAt)}</span></div>
+                          </div>
                       </div>
                   ))}
                   {labReports.length === 0 && <div className="empty-state-small"><p>No lab reports</p></div>}
@@ -356,7 +282,7 @@ const Dashboard = () => {
               <div className="column-footer"><Link to="/lab-reports" className="view-all-link">View All Reports →</Link></div>
             </div>
 
-            {/* Pharmacy Column */}
+            {/* Pharmacy */}
             <div className="dashboard-column animate-on-scroll slide-up delay-300">
                <div className="column-header">
                   <div className="column-icon">💊</div>
@@ -364,27 +290,29 @@ const Dashboard = () => {
               </div>
               <div className="column-content">
                   {pharmacyOrders.slice(0, 5).map(order => (
-                      <div key={order.id} className="dashboard-item">
-                           <div className="item-header"><span className="item-id">{order.orderId}</span><span className={`status-badge status-${order.status}`}>{order.status}</span></div>
-                           <div className="item-body"><h3>{order.items.length} items</h3><div className="item-details"><span className="detail">📅 {formatDate(order.orderDate)}</span><span className="detail">₹{order.totalAmount}</span></div></div>
+                      <div key={order._id} className="dashboard-item">
+                           <div className="item-header">
+                             <span className="item-id">#{order._id.slice(-6).toUpperCase()}</span>
+                             <span className={`status-badge status-${order.orderStatus?.toLowerCase()}`}>{order.orderStatus}</span>
+                           </div>
+                           <div className="item-body">
+                             <h3>{order.items?.length || 0} items</h3>
+                             <div className="item-details">
+                               <span className="detail">📅 {formatDate(order.createdAt)}</span>
+                               <span className="detail"><b>Status:</b> {order.paymentStatus}</span>
+                             </div>
+                           </div>
                       </div>
                   ))}
-                  {pharmacyOrders.length === 0 && <div className="empty-state-small"><p>No orders</p></div>}
+                  {pharmacyOrders.length === 0 && <div className="empty-state-small"><p>No orders yet</p></div>}
               </div>
               <div className="column-footer"><Link to="/pharmacy" className="view-all-link">View All Orders →</Link></div>
             </div>
-
           </div>
         )}
       </div>
 
-      {/* Prescription Modal */}
-      {selectedAppointment && (
-        <PrescriptionModal 
-            appointment={selectedAppointment} 
-            onClose={() => setSelectedAppointment(null)} 
-        />
-      )}
+      {selectedAppointment && <PrescriptionModal appointment={selectedAppointment} onClose={() => setSelectedAppointment(null)} />}
     </div>
   );
 };

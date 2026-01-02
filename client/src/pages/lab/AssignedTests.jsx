@@ -275,6 +275,7 @@ const AssignedTests = () => {
                 <div className="form-group">
                     <label><FaNotesMedical/> Technician Observations</label>
                     <textarea 
+                    style={{color:'black'}}
                         value={notes} 
                         onChange={(e) => setNotes(e.target.value)} 
                         placeholder="Add results summary or internal notes..."
