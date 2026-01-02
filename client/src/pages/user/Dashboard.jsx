@@ -1,4 +1,3 @@
-// client/src/pages/user/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Dashboard.css';
@@ -169,21 +168,18 @@ const Dashboard = () => {
         setIsLoading(true);
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         try {
-            // 1. Fetch Appointments
             const appointmentsResponse = await fetch(`${API_BASE}/api/appointments/my-appointments`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const appointmentsData = await appointmentsResponse.json();
             if (appointmentsData.success) setAppointments(appointmentsData.appointments || []);
 
-            // 2. Fetch Lab Reports
             const labResponse = await fetch(`${API_BASE}/api/lab/my-reports`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const labData = await labResponse.json();
             if (labData.success) setLabReports(labData.reports || []);
 
-            // 3. Fetch Pharmacy Orders
             const pharmacyResponse = await fetch(`${API_BASE}/api/pharmacy/orders/my-orders`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -228,7 +224,8 @@ const Dashboard = () => {
                     <div className="loading-state"><div className="loading-spinner"></div><p>Loading your dashboard...</p></div>
                 ) : (
                     <div className="dashboard-grid">
-                        {/* Appointments */}
+
+                        {/* --- APPOINTMENTS (Max 3) --- */}
                         <div className="dashboard-column animate-on-scroll slide-up delay-100">
                             <div className="column-header">
                                 <div className="column-icon">📅</div>
@@ -237,7 +234,8 @@ const Dashboard = () => {
                             <div className="column-content">
                                 {appointments.length > 0 ? (
                                     <div className="items-list">
-                                        {appointments.slice(0, 5).map((appointment) => (
+                                        {/* SLICE TO 3 */}
+                                        {appointments.slice(0, 3).map((appointment) => (
                                             <div key={appointment._id} className={`dashboard-item ${isUpcoming(appointment.appointmentDate, appointment.appointmentTime) ? 'upcoming' : 'past'}`}>
                                                 <div className="item-header">
                                                     <span className={`status-badge status-${appointment.status}`}>{appointment.status}</span>
@@ -249,7 +247,6 @@ const Dashboard = () => {
                                                         <span className="detail">🕐 {appointment.appointmentTime}</span>
                                                     </div>
 
-                                                    {/* --- ADDED: Medicines Preview directly on card --- */}
                                                     {appointment.pharmacy && appointment.pharmacy.length > 0 && (
                                                         <div className="meds-preview" style={{
                                                             marginTop: '8px',
@@ -272,17 +269,20 @@ const Dashboard = () => {
                                     </div>
                                 ) : <div className="empty-state-small"><p>No appointments yet</p></div>}
                             </div>
-                            <div className="column-footer"><Link to="/appointment" className="view-all-link">View All Appointments →</Link></div>
+                            <div className="column-footer">
+                                <Link to="/appointment" className="view-all-link">View Previous Appointments →</Link>
+                            </div>
                         </div>
 
-                        {/* Lab Reports */}
+                        {/* --- LAB REPORTS (Max 3) --- */}
                         <div className="dashboard-column animate-on-scroll slide-up delay-200">
                             <div className="column-header">
                                 <div className="column-icon">🔬</div>
                                 <div><h2>Lab Reports</h2><p className="column-count">{labReports.length} reports</p></div>
                             </div>
                             <div className="column-content">
-                                {labReports.slice(0, 5).map(report => (
+                                {/* SLICE TO 3 */}
+                                {labReports.slice(0, 3).map(report => (
                                     <div key={report._id} className="dashboard-item">
                                         <div className="item-header">
                                             <span className="item-id">#{report._id.slice(-6).toUpperCase()}</span>
@@ -296,17 +296,20 @@ const Dashboard = () => {
                                 ))}
                                 {labReports.length === 0 && <div className="empty-state-small"><p>No lab reports</p></div>}
                             </div>
-                            <div className="column-footer"><Link to="/lab-reports" className="view-all-link">View All Reports →</Link></div>
+                            <div className="column-footer">
+                                <Link to="/lab-reports" className="view-all-link">View Previous Reports →</Link>
+                            </div>
                         </div>
 
-                        {/* Pharmacy */}
+                        {/* --- PHARMACY (Max 3) --- */}
                         <div className="dashboard-column animate-on-scroll slide-up delay-300">
                             <div className="column-header">
                                 <div className="column-icon">💊</div>
                                 <div><h2>Pharmacy</h2><p className="column-count">{pharmacyOrders.length} orders</p></div>
                             </div>
                             <div className="column-content">
-                                {pharmacyOrders.slice(0, 5).map(order => (
+                                {/* SLICE TO 3 */}
+                                {pharmacyOrders.slice(0, 3).map(order => (
                                     <div key={order._id} className="dashboard-item">
                                         <div className="item-header">
                                             <span className="item-id">#{order._id.slice(-6).toUpperCase()}</span>
@@ -323,7 +326,9 @@ const Dashboard = () => {
                                 ))}
                                 {pharmacyOrders.length === 0 && <div className="empty-state-small"><p>No orders yet</p></div>}
                             </div>
-                            <div className="column-footer"><Link to="/pharmacy" className="view-all-link">View All Orders →</Link></div>
+                            <div className="column-footer">
+                                <Link to="/pharmacy" className="view-all-link">View Previous Orders →</Link>
+                            </div>
                         </div>
                     </div>
                 )}

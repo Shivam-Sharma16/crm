@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
-import { updatePrescription, deletePrescription, fetchPatientHistory } from '../../store/slices/doctorSlice';
+// 1. IMPORT fetchDoctorAppointments
+import { updatePrescription, deletePrescription, fetchPatientHistory, fetchDoctorAppointments } from '../../store/slices/doctorSlice';
 import api from '../../utils/api';
 import './Patient.css';
 
-// --- IVF RELATED DATA CONSTANTS ---
+// ... (Your Constants like IVF_LAB_TESTS, IVF_DIET_PLAN, FREQUENCY_OPTIONS remain the same) ...
 const IVF_LAB_TESTS = [
     "FSH (Follicle Stimulating Hormone)",
     "LH (Luteinizing Hormone)",
@@ -34,8 +35,6 @@ const IVF_DIET_PLAN = [
     "Folic Acid Rich Foods"
 ];
 
-// REMOVED: IVF_MEDICATIONS hardcoded constant
-
 const FREQUENCY_OPTIONS = [
     "Once a day",
     "Twice a day",
@@ -47,7 +46,7 @@ const FREQUENCY_OPTIONS = [
     "Empty stomach"
 ];
 
-// --- HELPER COMPONENT: Multi-Select Dropdown ---
+// ... (MultiSelectDropdown component remains the same) ...
 const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -75,7 +74,6 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
     return (
         <div className="multiselect-container" ref={dropdownRef}>
             <label className="multiselect-label">{title}</label>
-
             <div
                 className={`multiselect-header ${isOpen ? 'open' : ''}`}
                 onClick={() => setIsOpen(!isOpen)}
@@ -83,7 +81,6 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
                 <span>{selected.length > 0 ? `${selected.length} selected` : 'Select options...'}</span>
                 <span className="multiselect-arrow">▼</span>
             </div>
-
             {isOpen && (
                 <div className="multiselect-menu">
                     {options.map((option) => (
@@ -103,7 +100,6 @@ const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
                     ))}
                 </div>
             )}
-
             <div className="multiselect-tags">
                 {selected.map(item => (
                     <span key={item} className="multiselect-tag">
@@ -120,7 +116,15 @@ const DoctorPatientDetails = () => {
     const { appointmentId } = useParams();
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
-    const { appointments, patientHistory } = useDoctors();
+    // 2. GET loading state
+    const { appointments, patientHistory, loading } = useDoctors();
+
+    // 3. FETCH DATA IF MISSING (Fixes Refresh/Navigation Bug)
+    useEffect(() => {
+        if (appointments.length === 0) {
+            dispatch(fetchDoctorAppointments());
+        }
+    }, [dispatch, appointments.length]);
 
     const appointment = appointments.find(a => a._id === appointmentId);
 
@@ -134,26 +138,19 @@ const DoctorPatientDetails = () => {
     const [selectedDiet, setSelectedDiet] = useState([]);
     const [selectedMedNames, setSelectedMedNames] = useState([]);
     const [pharmacyDetails, setPharmacyDetails] = useState([]);
-
-    // NEW: Available Medicines State
     const [availableMedicines, setAvailableMedicines] = useState([]);
     const [availableLabs, setAvailableLabs] = useState([]);
     const [selectedLabId, setSelectedLabId] = useState('');
 
-    // 1. Fetch Prescription Data (Labs and In-Stock Medicines)
     useEffect(() => {
         const fetchPrescriptionData = async () => {
             try {
-                // Fetch Available Labs
                 const labRes = await api.get('/api/doctor/labs-list');
                 if (labRes.data.success) {
                     setAvailableLabs(labRes.data.labs);
                 }
-
-                // FETCH MEDICINES: From Inventory where stock > 0
                 const medRes = await api.get('/api/doctor/medicines-list');
                 if (medRes.data.success) {
-                    // Map to a list of formatted strings for the dropdown
                     const medOptions = medRes.data.medicines.map(m =>
                         `${m.name} (${m.stock} ${m.unit} available)`
                     );
@@ -166,14 +163,13 @@ const DoctorPatientDetails = () => {
         fetchPrescriptionData();
     }, []);
 
-    // 2. Initialize Data from Appointment
+    // Initialize Data from Appointment
     useEffect(() => {
         if (appointment) {
             setNotes(appointment.notes || '');
             if (appointment.labTests) setSelectedLabs(appointment.labTests);
             if (appointment.dietPlan || appointment.diet) setSelectedDiet(appointment.dietPlan || appointment.diet);
 
-            // Initialize Pharmacy
             if (appointment.pharmacy) {
                 const mappedPharmacy = appointment.pharmacy.map(p => ({
                     name: p.medicineName || p.name,
@@ -184,13 +180,11 @@ const DoctorPatientDetails = () => {
                 setSelectedMedNames(mappedPharmacy.map(p => p.name));
             }
 
-            // Initialize Selected Lab
             if (appointment.labId) {
                 const labVal = typeof appointment.labId === 'object' ? appointment.labId._id : appointment.labId;
                 setSelectedLabId(labVal);
             }
 
-            // Fetch History
             const pId = appointment.patientId || appointment.userId?._id;
             if (pId) {
                 dispatch(fetchPatientHistory(pId));
@@ -202,8 +196,6 @@ const DoctorPatientDetails = () => {
         setSelectedMedNames(newNames);
         setPharmacyDetails(prev => {
             return newNames.map(name => {
-                // We strip the stock info for the state if necessary, 
-                // but here we match against the selected option string
                 const existing = prev.find(p => p.name === name);
                 return existing || { name, frequency: '', duration: '' };
             });
@@ -231,14 +223,10 @@ const DoctorPatientDetails = () => {
         if (file) formData.append('prescriptionFile', file);
         formData.append('diagnosis', notes);
         formData.append('status', 'completed');
-
         formData.append('labTests', JSON.stringify(selectedLabs));
         formData.append('dietPlan', JSON.stringify(selectedDiet));
         formData.append('pharmacy', JSON.stringify(pharmacyDetails));
-
-        if (selectedLabId) {
-            formData.append('labId', selectedLabId);
-        }
+        if (selectedLabId) formData.append('labId', selectedLabId);
 
         try {
             await dispatch(updatePrescription({ appointmentId, formData })).unwrap();
@@ -262,10 +250,12 @@ const DoctorPatientDetails = () => {
         }
     };
 
-    if (!appointment) return <div className="patient-container">Appointment not found.</div>;
+    // 4. HANDLE LOADING STATE
+    if (loading) return <div className="patient-container"><div className="loader"></div> Loading patient details...</div>;
+
+    if (!appointment) return <div className="patient-container">Appointment not found. Please go back and select a patient again.</div>;
 
     const labReports = appointment.prescriptions?.filter(p => p.type === 'lab_report') || [];
-
     const getDoctorDocuments = () => {
         const allDocs = appointment.prescriptions || [];
         const docDocs = allDocs.filter(p => p.type !== 'lab_report');
@@ -274,7 +264,6 @@ const DoctorPatientDetails = () => {
         }
         return docDocs;
     };
-
     const doctorDocuments = getDoctorDocuments();
     const patientDisplayId = appointment.patientId || appointment.userId?.patientId || 'N/A';
 
@@ -297,7 +286,6 @@ const DoctorPatientDetails = () => {
 
                     <hr className="divider" />
 
-                    {/* --- PATIENT HISTORY SECTION --- */}
                     {patientHistory && patientHistory.length > 0 && (
                         <div className="history-section">
                             <h3>Patient History</h3>
@@ -316,7 +304,6 @@ const DoctorPatientDetails = () => {
 
                     <hr className="divider" />
 
-                    {/* --- LAB RESULTS --- */}
                     {labReports.length > 0 && (
                         <div className="lab-reports-section" style={{ marginBottom: '30px' }}>
                             <h3 style={{ color: '#0284c7', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -377,7 +364,6 @@ const DoctorPatientDetails = () => {
                     </div>
 
                     <div className="form-group-row">
-                        {/* UPDATED: Uses dynamic medicines list with stock info */}
                         <MultiSelectDropdown
                             title="Pharmacy & Medications (In-Stock Only)"
                             options={availableMedicines}
@@ -391,7 +377,6 @@ const DoctorPatientDetails = () => {
                                 {pharmacyDetails.map((med, index) => (
                                     <div key={index} className="medication-row">
                                         <div className="med-name">{med.name}</div>
-
                                         <select
                                             value={med.frequency}
                                             onChange={(e) => handlePharmacyDetailChange(index, 'frequency', e.target.value)}
@@ -400,7 +385,6 @@ const DoctorPatientDetails = () => {
                                             <option value="">Select Frequency</option>
                                             {FREQUENCY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                         </select>
-
                                         <input
                                             type="text"
                                             placeholder="Duration (e.g. 5 days)"
@@ -469,118 +453,6 @@ const DoctorPatientDetails = () => {
                     </button>
                 </div>
             </div>
-
-            <div className="form-group-row">
-                <MultiSelectDropdown 
-                    title="Lab Tests (IVF)" 
-                    options={IVF_LAB_TESTS} 
-                    selected={selectedLabs} 
-                    onChange={setSelectedLabs} 
-                />
-            </div>
-
-            <div className="form-group-row">
-                <MultiSelectDropdown 
-                    title="Dietary Recommendations" 
-                    options={IVF_DIET_PLAN} 
-                    selected={selectedDiet} 
-                    onChange={setSelectedDiet} 
-                />
-            </div>
-
-            <div className="form-group-row">
-                <MultiSelectDropdown 
-                    title="Pharmacy & Medications" 
-                    options={IVF_MEDICATIONS} 
-                    selected={selectedMedNames} 
-                    onChange={handleMedNameChange} 
-                />
-
-                {pharmacyDetails.length > 0 && (
-                    <div className="pharmacy-details-box">
-                        <h4>Medication Details</h4>
-                        {pharmacyDetails.map((med, index) => (
-                            <div key={index} className="medication-row">
-                                <div className="med-name">{med.name}</div>
-                                
-                                <select 
-                                    value={med.frequency}
-                                    onChange={(e) => handlePharmacyDetailChange(index, 'frequency', e.target.value)}
-                                    className="med-input"
-                                >
-                                    <option value="">Select Frequency</option>
-                                    {FREQUENCY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
-
-                                <input 
-                                    type="text" 
-                                    placeholder="Duration (e.g. 5 days)" 
-                                    value={med.duration}
-                                    onChange={(e) => handlePharmacyDetailChange(index, 'duration', e.target.value)}
-                                    className="med-input"
-                                />
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            
-            <hr className="divider" />
-
-            {/* Documents Section (Doctor's Uploads) */}
-            <div className="prescriptions-section">
-                <h3>Uploaded Documents</h3>
-                {doctorDocuments.length === 0 ? (
-                    <p className="no-docs-text">No documents uploaded yet.</p>
-                ) : (
-                    <div className="prescriptions-list">
-                        {doctorDocuments.map((item, index) => (
-                            <div key={item._id || index} className="prescription-item">
-                                <a href={item.url} target="_blank" rel="noopener noreferrer" className="doc-link">
-                                    <div className="doc-icon">📄</div>
-                                    <div className="doc-name">{item.name || 'Document'}</div>
-                                </a>
-                                {item._id !== 'legacy' && (
-                                    <button onClick={() => handleDeletePrescription(item._id)} className="doc-remove-btn">
-                                        Remove
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <h3 className="section-title">Add File / Notes</h3>
-            <div className="form-group">
-                <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="file-input" />
-            </div>
-
-            {preview && file && !file.type.includes('pdf') && (
-              <div className="preview-container">
-                <img src={preview} alt="Preview" />
-              </div>
-            )}
-
-            <div className="form-group">
-                <textarea 
-                style={{color:'black'}}
-                    rows="4"
-                    className="notes-input"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="General diagnosis notes..."
-                />
-            </div>
-
-            <button 
-              onClick={handleSave} 
-              className="auth-button save-btn"
-              disabled={isUploading}
-            >
-              {isUploading ? 'Saving...' : 'Save Treatment Plan'}
-            </button>
-
         </div>
     );
 };
