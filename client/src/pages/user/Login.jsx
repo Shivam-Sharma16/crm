@@ -15,135 +15,122 @@ const Login = () => {
     password: ''
   });
 
-  // Clear error on mount
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
 
-  // Navigate after successful login
   useEffect(() => {
     if (isAuthenticated && user) {
       const userRole = user.role;
-      if (userRole === 'admin') {
-        navigate('/admin');
-      } else if (userRole === 'doctor') {
-        navigate('/doctor/patients');
-      } else if (userRole === 'lab') {
-        navigate('/lab/dashboard');
-      } else if (userRole === 'pharmacy') {
-        navigate('/pharmacy/dashboard');
-      } else if (userRole === 'reception') {
-        navigate('/reception/dashboard');
-      } else {
-        const redirect = searchParams.get('redirect');
-        navigate(redirect || '/');
-      }
+      const redirectMap = {
+        admin: '/admin',
+        doctor: '/doctor/patients',
+        lab: '/lab/dashboard',
+        pharmacy: '/pharmacy/dashboard',
+        reception: '/reception/dashboard'
+      };
+      navigate(redirectMap[userRole] || searchParams.get('redirect') || '/');
     }
   }, [isAuthenticated, user, navigate, searchParams]);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
     dispatch(clearError());
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     dispatch(clearError());
+    if (!formData.email || !formData.password) return;
 
-    // Validation
-    if (!formData.email || !formData.password) {
-      return;
-    }
-
-    const result = await dispatch(loginUser({
+    await dispatch(loginUser({
       email: formData.email,
       password: formData.password
     }));
-
-    // Navigation is handled by useEffect when isAuthenticated changes
-  };
-
-  const handleGoBack = () => {
-    navigate("/"); // Go back to previous page
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-container">
-        <div className="auth-card">
-          {/* Back Button */}
-          <button 
-            onClick={handleGoBack}
-            className="back-button"
-            type="button"
-          >
-            <span className="back-icon">←</span>
-            <span>Go Back</span>
-          </button>
+    <section className="auth-section">
+      {/* Decorative Blobs from HTML */}
+      <div className="auth-blob blob-1"></div>
+      <div className="auth-blob blob-2"></div>
 
-          <div className="auth-header">
-            <h1>Welcome Back</h1>
-            <p>Sign in to your account</p>
-          </div>
+      <div className="auth-card">
+        {/* Left Side: Form Area */}
+        <div className="auth-form-container">
+          <div id="login-box" className="auth-box show">
+            <h2 style={{ marginBottom: '5px' }}>Welcome Back</h2>
+            <p style={{ color: '#666', marginBottom: '30px' }}>Access your patient portal securely.</p>
+            
+            {error && <div className="error-message" style={{ marginBottom: '20px' }}>{error}</div>}
 
-          {error && (
-            <div className="error-message">
-              {error}
+            <form onSubmit={handleSubmit}>
+              <div className="input-group">
+                <label>Email Address</label>
+                <div className="input-wrapper">
+                  <i className="fa-regular fa-envelope"></i>
+                  <input 
+                    type="email" 
+                    name="email"
+                    placeholder="e.g. name@example.com" 
+                    value={formData.email}
+                    onChange={handleChange}
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label>Password</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-lock"></i>
+                  <input 
+                    type="password" 
+                    name="password"
+                    placeholder="••••••••" 
+                    value={formData.password}
+                    onChange={handleChange}
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '0.9rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#666', fontWeight: '400' }}>
+                  <input type="checkbox" /> Remember me
+                </label>
+                <a href="#" style={{ color: 'var(--brand-pink)' }}>Forgot Password?</a>
+              </div>
+
+              <button className="btn-primary btn-block" disabled={loading}>
+                {loading ? 'Signing In...' : 'Sign In'}
+              </button>
+            </form>
+
+            <div className="divider"><span>Or continue with</span></div>
+            <div className="social-login">
+              <div className="social-btn" title="Login with Google"><i className="fa-brands fa-google"></i></div>
+              <div className="social-btn" title="Login with Facebook"><i className="fa-brands fa-facebook-f"></i></div>
+              <div className="social-btn" title="Login with Apple"><i className="fa-brands fa-apple"></i></div>
             </div>
-          )}
 
-          <form onSubmit={handleSubmit} className="auth-form">
-            <div className="form-group">
-              <label htmlFor="email">Email Address</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              className="auth-button"
-              disabled={loading}
-            >
-              {loading ? 'Signing In...' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="auth-footer">
-            <p>
-              Don't have an account?{' '}
-              <Link to="/signup" className="auth-link">
-                Sign Up
-              </Link>
+            <p className="switch-text">
+              New to Krisna IVF? <Link to="/signup" className="switch-link">Create Account</Link>
             </p>
           </div>
         </div>
+
+        {/* Right Side: Visual Content */}
+        <div className="auth-visual">
+          <img src="https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop" alt="Happy Family" />
+          <div className="auth-content auth-box show">
+            <h2>Your Trust, <br /> Our Commitment.</h2>
+            <p>Login to view your treatment plans, test reports, and upcoming schedules with complete privacy.</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 };
 
 export default Login;
-

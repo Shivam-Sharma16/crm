@@ -372,6 +372,14 @@ const Appointment = () => {
     setSelectedAppointment(apt);
     setShowDetailsModal(true);
   };
+  useEffect(() => {
+  if (showDetailsModal || showBookingModal) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = 'unset';
+  }
+  return () => { document.body.style.overflow = 'unset'; };
+}, [showDetailsModal, showBookingModal]);
 
   const isUpcoming = (appointmentDate, appointmentTime) => {
     const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);

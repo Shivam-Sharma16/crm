@@ -1,286 +1,233 @@
-/* --- CSS Variables (Matching existing theme) --- */
+/* ============================================================
+   1. BRAND VARIABLES & THEME
+   ============================================================ */
 :root {
-  --primary-blue: #0A2647;
-  --primary-teal: #14C38E;
-  --accent-aqua: #00FFAB;
-  --bg-light: #F8F9FD;
-  --white: #FFFFFF;
-  --text-dark: #1E293B;
-  --text-gray: #64748B;
+  --brand-pink: #d91a8a;
+  --brand-pink-soft: #ffeaf5;
+  --brand-teal: #0a7c86;
+  --brand-teal-dark: #065a61;
+  --bg-warm: #fdfbf9;
+  --text-heading: #2d2d2d;
+  --text-body: #555555; 
+  --radius-std: 20px;
+  --shadow-soft: 0 20px 40px rgba(0,0,0,0.04);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --error-red: #EF4444;
-  
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --shadow-glow: 0 0 30px rgba(20, 195, 142, 0.3);
-  --radius-lg: 16px;
-  --radius-xl: 24px;
 }
 
-/* --- Auth Page Container --- */
-.auth-page {
-  width: 100vw;
-  min-height: 100vh;
-  background: linear-gradient(135deg, var(--bg-light) 0%, var(--white) 50%, var(--bg-light) 100%);
+/* ============================================================
+   2. AUTH SECTION (FULL PAGE CONTAINER)
+   ============================================================ */
+.auth-section {
+  min-height: 90vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 60px 20px;
   position: relative;
+  background: radial-gradient(circle at top left, #fffcfd 0%, var(--bg-warm) 100%);
   overflow: hidden;
 }
 
-/* Background decoration */
-.auth-page::before {
-  content: '';
+/* Decorative Background Blobs */
+.auth-blob {
   position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(20, 195, 142, 0.05) 0%, transparent 70%);
-  animation: float 20s ease-in-out infinite;
+  border-radius: 50%;
+  z-index: 0;
+  opacity: 0.6;
+  animation: authFloat 10s infinite alternate;
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate(-30px, -30px) rotate(180deg);
-  }
+.blob-1 { width: 300px; height: 300px; background: var(--brand-pink-soft); top: -50px; left: -50px; }
+.blob-2 { width: 250px; height: 250px; background: #e0f7fa; bottom: 50px; right: -50px; }
+
+@keyframes authFloat { 
+  0% { transform: translateY(0); } 
+  100% { transform: translateY(20px); } 
 }
 
-/* --- Auth Container --- */
-.auth-container {
+/* ============================================================
+   3. THE MAIN CARD & FLEX LAYOUT
+   ============================================================ */
+.auth-card {
+  background: #fff;
   width: 100%;
-  max-width: 480px;
+  max-width: 1100px;
+  min-height: 650px;
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+  display: flex;
+  overflow: hidden;
   position: relative;
   z-index: 1;
+  animation: slideIn 0.5s ease-out;
 }
 
-/* --- Auth Card --- */
-.auth-card {
-  background: var(--white);
-  border-radius: var(--radius-xl);
-  padding: 48px 40px;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Left Side: Signup Form Area */
+.auth-form-container {
+  flex: 1.2; /* Slightly wider to accommodate more signup fields */
+  padding: 40px 50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Right Side: Visual Branding Area */
+.auth-visual {
+  flex: 1;
+  background: linear-gradient(135deg, var(--brand-teal), var(--brand-teal-dark));
   position: relative;
-  overflow: hidden;
-  animation: slideUp 0.5s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Card accent bar */
-.auth-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 4px;
-  background: linear-gradient(90deg, var(--primary-teal), var(--accent-aqua));
-}
-
-/* --- Auth Header --- */
-.auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
   text-align: center;
-  margin-bottom: 32px;
+  padding: 40px;
+  overflow: hidden;
 }
 
-.auth-header h1 {
-  font-size: 2rem;
-  color: var(--primary-blue);
-  margin-bottom: 8px;
-  font-weight: 700;
+.auth-visual img {
+  position: absolute; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%;
+  object-fit: cover; 
+  opacity: 0.35; 
+  mix-blend-mode: overlay;
 }
 
-.auth-header p {
-  color: var(--text-gray);
-  font-size: 1rem;
+.auth-content { 
+  position: relative; 
+  z-index: 2; 
+  max-width: 380px; 
 }
 
-/* --- Error Message --- */
-.error-message {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error-red);
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  font-size: 0.9rem;
-  border-left: 3px solid var(--error-red);
-  animation: shake 0.3s ease-in-out;
+.auth-content h2 { 
+  color: #fff; 
+  font-size: 2.5rem; 
+  margin-bottom: 15px; 
+  font-family: 'Playfair Display', serif;
+  line-height: 1.2;
 }
 
-@keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-5px);
-  }
-  75% {
-    transform: translateX(5px);
-  }
+/* ============================================================
+   4. INPUTS & FORM CONTROLS
+   ============================================================ */
+.auth-box {
+  transition: all 0.5s ease-in-out;
 }
 
-/* --- Auth Form --- */
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.auth-box.show { display: block; opacity: 1; }
+
+.input-group { margin-bottom: 15px; } /* Slightly tighter for signup fields */
+.input-group label { 
+  display: block; 
+  font-size: 0.85rem; 
+  font-weight: 600; 
+  margin-bottom: 6px; 
+  color: var(--text-heading); 
 }
 
-/* --- Form Group --- */
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.input-wrapper { position: relative; }
+.input-wrapper i { 
+  position: absolute; 
+  left: 15px; 
+  top: 50%; 
+  transform: translateY(-50%); 
+  color: #aaa; 
 }
 
-.form-group label {
-  color: var(--text-dark);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 14px 16px;
-  border: 2px solid rgba(226, 232, 240, 0.8);
-  border-radius: 10px;
-  font-size: 1rem;
-  color: var(--text-dark);
-  background: var(--white);
-  transition: all 0.3s ease;
+.input-wrapper input {
+  width: 100%; 
+  padding: 12px 15px 12px 45px;
+  border: 1px solid #eee; 
+  border-radius: 12px;
+  background: #f9f9f9; 
+  font-size: 0.95rem; 
+  transition: var(--transition);
   box-sizing: border-box;
 }
 
-.form-group input:focus {
-  outline: none;
-  border-color: var(--primary-teal);
-  box-shadow: 0 0 0 3px rgba(20, 195, 142, 0.1);
+.input-wrapper input:focus { 
+  background: #fff; 
+  border-color: var(--brand-pink); 
+  outline: none; 
+  box-shadow: 0 0 0 4px rgba(217, 26, 138, 0.1); 
 }
 
-.form-group input::placeholder {
-  color: var(--text-gray);
-  opacity: 0.6;
-}
-
-/* --- Auth Button --- */
-.auth-button {
-  width: 100%;
-  padding: 16px;
-  background: linear-gradient(135deg, var(--primary-teal), var(--accent-aqua));
-  color: var(--white);
-  border: none;
-  border-radius: 10px;
-  font-size: 1rem;
+/* ============================================================
+   5. SIGNUP BUTTON
+   ============================================================ */
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-pink), #b0126e);
+  color: #fff !important;
+  padding: 14px 30px;
+  border-radius: 50px;
+  display: inline-block;
   font-weight: 600;
+  border: none;
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 8px;
-  position: relative;
-  overflow: hidden;
+  box-shadow: 0 10px 20px rgba(217, 26, 138, 0.25);
+  transition: var(--transition);
 }
 
-.auth-button::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+.btn-primary:hover { 
+  transform: translateY(-3px); 
+  box-shadow: 0 15px 30px rgba(217, 26, 138, 0.4); 
 }
 
-.auth-button:hover::before {
-  width: 300px;
-  height: 300px;
-}
-
-.auth-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md), var(--shadow-glow);
-}
-
-.auth-button:active {
-  transform: translateY(0);
-}
-
-.auth-button:disabled {
+.btn-primary:disabled {
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
 }
 
-/* --- Auth Footer --- */
-.auth-footer {
-  text-align: center;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(226, 232, 240, 0.8);
+.btn-block { width: 100%; font-size: 1.05rem; margin-top: 15px; }
+
+/* ============================================================
+   6. EXTRAS (ERROR, FOOTER TEXT, LINKS)
+   ============================================================ */
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error-red);
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  border-left: 3px solid var(--error-red);
+  text-align: left;
 }
 
-.auth-footer p {
-  color: var(--text-gray);
+.switch-text { 
+  text-align: center; 
+  color: #666; 
+  margin-top: 20px; 
   font-size: 0.9rem;
 }
 
-.auth-link {
-  color: var(--primary-teal);
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
+.switch-link { 
+  color: var(--brand-pink); 
+  font-weight: 700; 
+  cursor: pointer; 
+  text-decoration: underline; 
 }
 
-.auth-link:hover {
-  color: var(--primary-blue);
-  text-decoration: underline;
+/* ============================================================
+   7. RESPONSIVE ADJUSTMENTS
+   ============================================================ */
+@media (max-width: 900px) {
+  .auth-visual { display: none; }
+  .auth-form-container { padding: 40px 25px; }
+  .auth-card { min-height: auto; max-width: 500px; }
 }
 
-/* --- Responsive Design --- */
-@media (max-width: 640px) {
-  .auth-card {
-    padding: 32px 24px;
-  }
-
-  .auth-header h1 {
-    font-size: 1.75rem;
-  }
-
-  .form-group input {
-    padding: 12px 14px;
-  }
-
-  .auth-button {
-    padding: 14px;
-  }
+@media (max-width: 480px) {
+  .auth-section { padding: 20px 15px; }
+  .auth-form-container { padding: 30px 20px; }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

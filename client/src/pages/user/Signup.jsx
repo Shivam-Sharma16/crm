@@ -17,23 +17,16 @@ const Signup = () => {
     phone: ''
   });
   
-  // Navigate after successful signup
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
+    if (isAuthenticated) navigate('/');
   }, [isAuthenticated, navigate]);
   
-  // Clear error on mount
   useEffect(() => {
     dispatch(clearError());
   }, [dispatch]);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
     dispatch(clearError());
   };
 
@@ -41,17 +34,9 @@ const Signup = () => {
     e.preventDefault();
     dispatch(clearError());
 
-    // Validation
-    if (!formData.name || !formData.email || !formData.password) {
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      return;
-    }
-
     if (formData.password !== formData.confirmPassword) {
-      return;
+       // You might want to dispatch a local error here
+       return;
     }
 
     await dispatch(signupUser({
@@ -60,114 +45,117 @@ const Signup = () => {
       password: formData.password,
       phone: formData.phone
     }));
-    
-    // Navigation is handled by useEffect when isAuthenticated changes
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-container">
-        <div className="auth-card">
-          <div className="auth-header">
-            <h1>Create Account</h1>
-            <p>Sign up to access our services</p>
-          </div>
+    <section className="auth-section">
+      <div className="auth-blob blob-1"></div>
+      <div className="auth-blob blob-2"></div>
 
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
+      <div className="auth-card">
+        <div className="auth-form-container">
+          <div id="signup-box" className="auth-box show">
+            <h2 style={{ marginBottom: '5px' }}>Start Your Journey</h2>
+            <p style={{ color: '#666', marginBottom: '30px' }}>Create an account to book and track appointments.</p>
+            
+            {error && <div className="error-message" style={{ marginBottom: '20px' }}>{error}</div>}
 
-          <form onSubmit={handleSubmit} className="auth-form">
-            <div className="form-group">
-              <label htmlFor="name">Full Name *</label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Enter your full name"
-                required
-              />
-            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="input-group">
+                <label>Full Name</label>
+                <div className="input-wrapper">
+                  <i className="fa-regular fa-user"></i>
+                  <input 
+                    type="text" 
+                    name="name" 
+                    placeholder="e.g. John Doe" 
+                    value={formData.name} 
+                    onChange={handleChange} 
+                    required 
+                  />
+                </div>
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="email">Email Address *</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
+              <div className="input-group">
+                <label>Email Address</label>
+                <div className="input-wrapper">
+                  <i className="fa-regular fa-envelope"></i>
+                  <input 
+                    type="email" 
+                    name="email" 
+                    placeholder="e.g. name@example.com" 
+                    value={formData.email} 
+                    onChange={handleChange} 
+                    required 
+                  />
+                </div>
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="phone">Phone Number</label>
-              <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter your phone number (optional)"
-              />
-            </div>
+              <div className="input-group">
+                <label>Phone Number</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-phone"></i>
+                  <input 
+                    type="tel" 
+                    name="phone" 
+                    placeholder="Your contact number" 
+                    value={formData.phone} 
+                    onChange={handleChange} 
+                  />
+                </div>
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="password">Password *</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password (min 6 characters)"
-                required
-              />
-            </div>
+              <div className="input-group">
+                <label>Create Password</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-lock"></i>
+                  <input 
+                    type="password" 
+                    name="password" 
+                    placeholder="Min 6 characters" 
+                    value={formData.password} 
+                    onChange={handleChange} 
+                    required 
+                  />
+                </div>
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="confirmPassword">Confirm Password *</label>
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="Confirm your password"
-                required
-              />
-            </div>
+              <div className="input-group">
+                <label>Confirm Password</label>
+                <div className="input-wrapper">
+                  <i className="fa-solid fa-shield-halved"></i>
+                  <input 
+                    type="password" 
+                    name="confirmPassword" 
+                    placeholder="Repeat your password" 
+                    value={formData.confirmPassword} 
+                    onChange={handleChange} 
+                    required 
+                  />
+                </div>
+              </div>
 
-            <button 
-              type="submit" 
-              className="auth-button"
-              disabled={loading}
-            >
-              {loading ? 'Creating Account...' : 'Sign Up'}
-            </button>
-          </form>
+              <button className="btn-primary btn-block" disabled={loading}>
+                {loading ? 'Creating Account...' : 'Create Account'}
+              </button>
+            </form>
 
-          <div className="auth-footer">
-            <p>
-              Already have an account?{' '}
-              <Link to="/login" className="auth-link">
-                Sign In
-              </Link>
+            <p className="switch-text" style={{ marginTop: '20px' }}>
+              Already have an account? <Link to="/login" className="switch-link">Sign In</Link>
             </p>
           </div>
         </div>
+
+        <div className="auth-visual">
+          <img src="https://images.unsplash.com/photo-1519689680058-324335c77eba?q=80&w=1000&auto=format&fit=crop" alt="Happy Family" />
+          <div className="auth-content auth-box show">
+            <h2>A New Beginning <br /> Starts Here.</h2>
+            <p>Join over 1,500+ happy families who trusted Krisna IVF to make their dreams come true.</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 };
 
 export default Signup;
-
-
-
