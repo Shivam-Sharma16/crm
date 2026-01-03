@@ -241,7 +241,7 @@ const Dashboard = () => {
                                                     <span className={`status-badge status-${appointment.status}`}>{appointment.status}</span>
                                                 </div>
                                                 <div className="item-body">
-                                                    <h3>{appointment.doctorName}</h3>
+                                                    <h3>Dr.{appointment.doctorName}</h3>
                                                     <div className="item-details">
                                                         <span className="detail">📅 {formatDate(appointment.appointmentDate)}</span>
                                                         <span className="detail">🕐 {appointment.appointmentTime}</span>
