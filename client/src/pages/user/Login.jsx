@@ -29,7 +29,7 @@ const Login = () => {
         pharmacy: '/pharmacy/dashboard',
         reception: '/reception/dashboard'
       };
-      navigate(redirectMap[userRole] || searchParams.get('redirect') || '/');
+      navigate(redirectMap[userRole] || searchParams.get('redirect') || '/dashboard');
     }
   }, [isAuthenticated, user, navigate, searchParams]);
 
