@@ -26,8 +26,8 @@ const Login = () => {
         admin: '/admin',
         doctor: '/doctor/patients',
         lab: '/lab/dashboard',
-        pharmacy: '/pharmacy/dashboard',
-        reception: '/reception/dashboard'
+        pharmacy: '/pharmacy/orders',
+        reception: '/pharmacy/inventory'
       };
       navigate(redirectMap[userRole] || searchParams.get('redirect') || '/');
     }
