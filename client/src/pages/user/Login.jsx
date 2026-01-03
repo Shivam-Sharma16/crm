@@ -26,8 +26,8 @@ const Login = () => {
         admin: '/admin',
         doctor: '/doctor/patients',
         lab: '/lab/dashboard',
-        pharmacy: '/pharmacy/orders',
-        reception: '/pharmacy/inventory'
+        pharmacy: '/pharmacy/dashboard',
+        reception: '/reception/dashboard'
       };
       navigate(redirectMap[userRole] || searchParams.get('redirect') || '/');
     }
@@ -51,7 +51,7 @@ const Login = () => {
 
   return (
     <section className="auth-section">
-      {/* Decorative Blobs from HTML */}
+      {/* Decorative Blobs */}
       <div className="auth-blob blob-1"></div>
       <div className="auth-blob blob-2"></div>
 
