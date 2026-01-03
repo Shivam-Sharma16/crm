@@ -19,7 +19,7 @@ const AssignedTests = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // --- NEW: Local State for Payment Details ---
+  // --- Local State for Payment Details ---
   const [paymentInfo, setPaymentInfo] = useState({
     status: 'PENDING',
     mode: 'NONE',
@@ -63,20 +63,27 @@ const AssignedTests = () => {
     setSelectedFile(null);
   };
 
-  // --- NEW: Handle Payment Status and Detail Updates ---
+  // --- FIXED: Payload keys now match backend expectations ---
   const handlePaymentUpdate = async () => {
-    // Determine new status and mode
     const updatedStatus = paymentInfo.status === 'PAID' ? 'PENDING' : 'PAID';
-    const payload = {
-        ...paymentInfo,
-        status: updatedStatus,
-        // Default to CASH if marking as paid and no mode selected
-        mode: updatedStatus === 'PAID' ? (paymentInfo.mode === 'NONE' ? 'CASH' : paymentInfo.mode) : 'NONE'
+    const updatedMode = updatedStatus === 'PAID' ? (paymentInfo.mode === 'NONE' ? 'CASH' : paymentInfo.mode) : 'NONE';
+    
+    // Construct payload with keys the backend expects (paymentStatus, paymentMode)
+    const apiPayload = {
+        paymentStatus: updatedStatus,
+        paymentMode: updatedMode,
+        amount: paymentInfo.amount
     };
     
-    // Update state and notify backend
-    await dispatch(updateLabPayment({ id: selectedRequest._id, paymentData: payload }));
-    setPaymentInfo(payload);
+    // Update backend
+    await dispatch(updateLabPayment({ id: selectedRequest._id, paymentData: apiPayload }));
+    
+    // Update local state to keep UI in sync
+    setPaymentInfo({
+        ...paymentInfo,
+        status: updatedStatus,
+        mode: updatedMode
+    });
   };
 
   const handleDrag = (e) => {
@@ -235,7 +242,7 @@ const AssignedTests = () => {
             </div>
             
             <div className="modal-content">
-              {/* --- NEW: Payment Verification Section --- */}
+              {/* --- Payment Verification Section --- */}
               <div className="payment-config-section">
                 <h3><FaCreditCard/> Payment Verification</h3>
                 <div className="payment-grid">
