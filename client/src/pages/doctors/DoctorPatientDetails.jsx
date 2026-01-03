@@ -2,12 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useDoctors } from '../../store/hooks';
-// 1. IMPORT fetchDoctorAppointments
 import { updatePrescription, deletePrescription, fetchPatientHistory, fetchDoctorAppointments } from '../../store/slices/doctorSlice';
 import api from '../../utils/api';
 import './Patient.css';
 
-// ... (Your Constants like IVF_LAB_TESTS, IVF_DIET_PLAN, FREQUENCY_OPTIONS remain the same) ...
 const IVF_LAB_TESTS = [
     "FSH (Follicle Stimulating Hormone)",
     "LH (Luteinizing Hormone)",
@@ -46,7 +44,6 @@ const FREQUENCY_OPTIONS = [
     "Empty stomach"
 ];
 
-// ... (MultiSelectDropdown component remains the same) ...
 const MultiSelectDropdown = ({ title, options, selected, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -116,10 +113,9 @@ const DoctorPatientDetails = () => {
     const { appointmentId } = useParams();
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
-    // 2. GET loading state
+
     const { appointments, patientHistory, loading } = useDoctors();
 
-    // 3. FETCH DATA IF MISSING (Fixes Refresh/Navigation Bug)
     useEffect(() => {
         if (appointments.length === 0) {
             dispatch(fetchDoctorAppointments());
@@ -163,7 +159,6 @@ const DoctorPatientDetails = () => {
         fetchPrescriptionData();
     }, []);
 
-    // Initialize Data from Appointment
     useEffect(() => {
         if (appointment) {
             setNotes(appointment.notes || '');
@@ -212,8 +207,7 @@ const DoctorPatientDetails = () => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
             setFile(selectedFile);
-            const objectUrl = URL.createObjectURL(selectedFile);
-            setPreview(objectUrl);
+            // Modified: No longer creating object URL for image preview
         }
     };
 
@@ -250,7 +244,6 @@ const DoctorPatientDetails = () => {
         }
     };
 
-    // 4. HANDLE LOADING STATE
     if (loading) return <div className="patient-container"><div className="loader"></div> Loading patient details...</div>;
 
     if (!appointment) return <div className="patient-container">Appointment not found. Please go back and select a patient again.</div>;
@@ -425,14 +418,19 @@ const DoctorPatientDetails = () => {
 
                     <h3 className="section-title">Add File / Notes</h3>
                     <div className="form-group">
+                        {/* Modified Upload Section: Added label and file name display */}
+                        <label className="multiselect-label" style={{ marginBottom: '8px', display: 'block' }}>Upload Document/Image</label>
                         <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="file-input" />
+
+                        {/* Show file name if selected */}
+                        {file && (
+                            <div style={{ marginTop: '10px', color: '#0a7c86', fontWeight: '500', fontSize: '0.9rem' }}>
+                                📎 Selected File: {file.name}
+                            </div>
+                        )}
                     </div>
 
-                    {preview && file && !file.type.includes('pdf') && (
-                        <div className="preview-container">
-                            <img src={preview} alt="Preview" />
-                        </div>
-                    )}
+                    {/* Removed the original Image Preview Logic from here */}
 
                     <div className="form-group">
                         <textarea
@@ -441,6 +439,7 @@ const DoctorPatientDetails = () => {
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                             placeholder="General diagnosis notes..."
+                            style={{ color: '#333' }} /* INLINE FIX: Ensures text is dark and visible */
                         />
                     </div>
 
